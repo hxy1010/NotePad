@@ -18,16 +18,25 @@ package com.example.android.notepad;
 
 import com.example.android.notepad.NotePad;
 
+import android.app.AlertDialog;
 import android.app.ListActivity;
+import android.content.ActivityNotFoundException;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.content.ComponentName;
 import android.content.ContentUris;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.text.Editable;
+import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.Menu;
@@ -36,8 +45,17 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.widget.AdapterView;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 
 /**
@@ -61,10 +79,93 @@ public class NotesList extends ListActivity {
     private static final String[] PROJECTION = new String[] {
             NotePad.Notes._ID, // 0
             NotePad.Notes.COLUMN_NAME_TITLE, // 1
+            NotePad.Notes.COLUMN_NAME_NOTE, // 2
+            NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE, // 3
     };
 
     /** The index of the title column */
     private static final int COLUMN_INDEX_TITLE = 1;
+
+    /** The cursor columns displayed by the list item layout */
+    private static final String[] FROM_COLUMNS = new String[] {
+            NotePad.Notes.COLUMN_NAME_TITLE,
+            NotePad.Notes.COLUMN_NAME_NOTE,
+            NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE,
+    };
+
+    /** The views of {@link R.layout#noteslist_item} that display FROM_COLUMNS */
+    private static final int[] TO_VIEWS = new int[] {
+            R.id.note_title,
+            R.id.note_preview,
+            R.id.note_time,
+    };
+
+    /** Request code used when asking the user where to save the exported notes */
+    private static final int REQUEST_EXPORT = 1;
+
+    /** Intent extra: ID of the notebook whose notes are displayed */
+    public static final String EXTRA_NOTEBOOK_ID = "notebook_id";
+
+    /** Intent extra: name of the notebook whose notes are displayed */
+    public static final String EXTRA_NOTEBOOK_NAME = "notebook_name";
+
+    /** The notebook being displayed, or -1 when the activity lists notes from every notebook */
+    private long mNotebookId = -1;
+
+    /** Backs the note list */
+    private SimpleCursorAdapter mAdapter;
+
+    /** The cursor currently displayed by mAdapter, so it can be closed in onDestroy() */
+    private Cursor mCursor;
+
+    /** The URI of the notes directory being displayed */
+    private Uri mContentUri;
+
+    /** The search keyword currently filtering the list, or "" when not searching */
+    private String mKeyword = "";
+
+    /** Preferences shared with the theme switcher */
+    private static final String PREF_NAME = "notepad_prefs";
+    private static final String PREF_SORT_ORDER = "note_sort_order";
+
+    /** Sort orders offered by the sort dialog */
+    private static final String[] SORT_ORDERS = new String[] {
+            NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " DESC",
+            NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " ASC",
+            NotePad.Notes.COLUMN_NAME_TITLE + " COLLATE NOCASE ASC",
+            NotePad.Notes.COLUMN_NAME_TITLE + " COLLATE NOCASE DESC",
+    };
+
+    /** Labels shown by the sort dialog, matching SORT_ORDERS */
+    private static final int[] SORT_LABELS = new int[] {
+            R.string.sort_modified_desc,
+            R.string.sort_modified_asc,
+            R.string.sort_title_asc,
+            R.string.sort_title_desc,
+    };
+
+    /** The currently selected sort order */
+    private String mSortOrder = SORT_ORDERS[0];
+
+    /**
+     * Re-queries the list whenever a note is inserted, updated or deleted, so the list stays
+     * in sync with the provider.
+     */
+    private final ContentObserver mObserver = new ContentObserver(new Handler()) {
+        @Override
+        public void onChange(boolean selfChange) {
+            queryNotes(mKeyword);
+        }
+    };
+
+    /** Formats the modification timestamp shown in the list */
+    private final SimpleDateFormat mDateFormat =
+            new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(ThemeUtils.wrap(newBase));
+    }
 
     /**
      * onCreate is called when Android starts this Activity from scratch.
@@ -88,6 +189,26 @@ public class NotesList extends ListActivity {
         if (intent.getData() == null) {
             intent.setData(NotePad.Notes.CONTENT_URI);
         }
+        mContentUri = intent.getData();
+
+        // Shows only the notes of the requested notebook.
+        mNotebookId = intent.getLongExtra(EXTRA_NOTEBOOK_ID, -1);
+        String notebookName = intent.getStringExtra(EXTRA_NOTEBOOK_NAME);
+        if (notebookName != null) {
+            setTitle(notebookName);
+        }
+
+        // Inflates a layout that contains a search box, the list of notes and an empty view.
+        setContentView(R.layout.notes_list);
+        BottomNav.bind(this, true);
+
+        // The empty state offers a real button so the hint and the action match.
+        findViewById(R.id.empty_new_note).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                addNote();
+            }
+        });
 
         /*
          * Sets the callback for context menu activation for the ListView. The listener is set
@@ -96,46 +217,152 @@ public class NotesList extends ListActivity {
          */
         getListView().setOnCreateContextMenuListener(this);
 
-        /* Performs a managed query. The Activity handles closing and requerying the cursor
-         * when needed.
-         *
-         * Please see the introductory note about performing provider operations on the UI thread.
-         */
-        Cursor cursor = managedQuery(
-            getIntent().getData(),            // Use the default content URI for the provider.
-            PROJECTION,                       // Return the note ID and title for each note.
-            null,                             // No where clause, return all records.
-            null,                             // No where clause, therefore no where column values.
-            NotePad.Notes.DEFAULT_SORT_ORDER  // Use the default sort order.
+        // Filters the list while the user types a title or content keyword.
+        EditText searchInput = (EditText) findViewById(R.id.search_input);
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                mKeyword = s.toString();
+                queryNotes(mKeyword);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+
+        // Watches the provider so the list refreshes when notes are added, edited or deleted.
+        getContentResolver().registerContentObserver(mContentUri, true, mObserver);
+
+        // Restores the order the user picked last time.
+        mSortOrder = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+                .getString(PREF_SORT_ORDER, SORT_ORDERS[0]);
+
+        // Shows every note until the user starts searching.
+        queryNotes(null);
+    }
+
+    /**
+     * Queries the notes provider and updates the list. If keyword is not empty, only notes whose
+     * title or content contains it are shown.
+     *
+     * @param keyword The text to search for, or null to display every note.
+     */
+    private void queryNotes(String keyword) {
+        String selection = null;
+        String[] selectionArgs = null;
+
+        if (keyword != null) {
+            String trimmed = keyword.trim();
+            if (trimmed.length() > 0) {
+                selection = "(" + NotePad.Notes.COLUMN_NAME_TITLE + " LIKE ? OR "
+                        + NotePad.Notes.COLUMN_NAME_NOTE + " LIKE ?)";
+                String like = "%" + trimmed + "%";
+                selectionArgs = new String[] { like, like };
+            }
+        }
+
+        // Restricts the list to the notebook that was opened from the notebook list.
+        if (mNotebookId > 0) {
+            String notebookSelection = NotePad.Notes.COLUMN_NAME_NOTEBOOK_ID + "=" + mNotebookId;
+            selection = selection == null ? notebookSelection : notebookSelection + " AND " + selection;
+        }
+
+        Cursor cursor = getContentResolver().query(
+                mContentUri,
+                PROJECTION,
+                selection,
+                selectionArgs,
+                mSortOrder
         );
 
-        /*
-         * The following two arrays create a "map" between columns in the cursor and view IDs
-         * for items in the ListView. Each element in the dataColumns array represents
-         * a column name; each element in the viewID array represents the ID of a View.
-         * The SimpleCursorAdapter maps them in ascending order to determine where each column
-         * value will appear in the ListView.
-         */
+        if (cursor == null) {
+            Log.e(TAG, "Failed to query notes at " + mContentUri);
+            return;
+        }
 
-        // The names of the cursor columns to display in the view, initialized to the title column
-        String[] dataColumns = { NotePad.Notes.COLUMN_NAME_TITLE } ;
+        if (mAdapter == null) {
+            // Creates the backing adapter for the ListView.
+            mAdapter = new SimpleCursorAdapter(
+                    this,                       // The Context for the ListView
+                    R.layout.noteslist_item,    // Points to the XML for a list item
+                    cursor,                     // The cursor to get items from
+                    FROM_COLUMNS,
+                    TO_VIEWS
+            );
 
-        // The view IDs that will display the cursor columns, initialized to the TextView in
-        // noteslist_item.xml
-        int[] viewIDs = { android.R.id.text1 };
+            // Formats the note preview and the modification timestamp.
+            mAdapter.setViewBinder(new SimpleCursorAdapter.ViewBinder() {
+                @Override
+                public boolean setViewValue(View view, Cursor c, int columnIndex) {
+                    String columnName = c.getColumnName(columnIndex);
 
-        // Creates the backing adapter for the ListView.
-        SimpleCursorAdapter adapter
-            = new SimpleCursorAdapter(
-                      this,                             // The Context for the ListView
-                      R.layout.noteslist_item,          // Points to the XML for a list item
-                      cursor,                           // The cursor to get items from
-                      dataColumns,
-                      viewIDs
-              );
+                    if (NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE.equals(columnName)) {
+                        long modified = c.getLong(columnIndex);
+                        ((TextView) view).setText(mDateFormat.format(new Date(modified)));
 
-        // Sets the ListView's adapter to be the cursor adapter that was just created.
-        setListAdapter(adapter);
+                        // Wires the trash icon of this row to the delete dialog.
+                        final long noteId = c.getLong(
+                                c.getColumnIndex(NotePad.Notes._ID));
+                        String title = c.getString(
+                                c.getColumnIndex(NotePad.Notes.COLUMN_NAME_TITLE));
+                        final String label = TextUtils.isEmpty(title)
+                                ? getString(R.string.note_untitled) : title;
+                        View row = (View) view.getParent();
+                        if (row != null) {
+                            View delete = row.findViewById(R.id.note_delete);
+                            if (delete != null) {
+                                delete.setOnClickListener(new View.OnClickListener() {
+                                    @Override
+                                    public void onClick(View v) {
+                                        confirmDeleteNote(noteId, label);
+                                    }
+                                });
+                            }
+                        }
+                        return true;
+                    } else if (NotePad.Notes.COLUMN_NAME_NOTE.equals(columnName)) {
+                        String note = c.getString(columnIndex);
+                        if (note != null) {
+                            // Keeps the preview on a single line.
+                            note = note.replace('\n', ' ').trim();
+                        }
+                        ((TextView) view).setText(note);
+                        return true;
+                    }
+                    return false;
+                }
+            });
+
+            // Sets the ListView's adapter to be the cursor adapter that was just created.
+            setListAdapter(mAdapter);
+            mCursor = cursor;
+        } else {
+            // Closes the previous cursor and displays the new results.
+            mAdapter.changeCursor(cursor);
+            mCursor = cursor;
+        }
+
+        // Updates the empty view so it explains why the list is empty.
+        TextView emptyView = (TextView) findViewById(R.id.empty_hint);
+        if (emptyView != null) {
+            boolean searching = keyword != null && keyword.trim().length() > 0;
+            emptyView.setText(searching ? R.string.search_no_result : R.string.list_empty);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        getContentResolver().unregisterContentObserver(mObserver);
+        if (mCursor != null) {
+            mCursor.close();
+            mCursor = null;
+        }
+        super.onDestroy();
     }
 
     /**
@@ -269,7 +496,7 @@ public class NotesList extends ListActivity {
              * has to have action ACTION_INSERT. No category is set, so DEFAULT is assumed.
              * In effect, this starts the NoteEditor Activity in NotePad.
              */
-            startActivity(new Intent(Intent.ACTION_INSERT, getIntent().getData()));
+            addNote();
             return true;
         } else if (item.getItemId() == R.id.menu_paste) {
             /*
@@ -277,10 +504,169 @@ public class NotesList extends ListActivity {
              * has to have action ACTION_PASTE. No category is set, so DEFAULT is assumed.
              * In effect, this starts the NoteEditor Activity in NotePad.
              */
-            startActivity(new Intent(Intent.ACTION_PASTE, getIntent().getData()));
+            Intent pasteIntent = new Intent(Intent.ACTION_PASTE, getIntent().getData());
+            pasteIntent.putExtra(EXTRA_NOTEBOOK_ID, mNotebookId);
+            startActivity(pasteIntent);
+            return true;
+        } else if (item.getItemId() == R.id.menu_export) {
+            exportNotes();
+            return true;
+        } else if (item.getItemId() == R.id.menu_sort) {
+            showSortDialog();
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    /** Lets the user pick how notes are ordered and remembers the choice. */
+    private void showSortDialog() {
+        int checked = 0;
+        for (int i = 0; i < SORT_ORDERS.length; i++) {
+            if (SORT_ORDERS[i].equals(mSortOrder)) {
+                checked = i;
+            }
+        }
+
+        CharSequence[] labels = new CharSequence[SORT_LABELS.length];
+        for (int i = 0; i < SORT_LABELS.length; i++) {
+            labels[i] = getString(SORT_LABELS[i]);
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.sort_title)
+                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mSortOrder = SORT_ORDERS[which];
+                        getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit()
+                                .putString(PREF_SORT_ORDER, mSortOrder).apply();
+                        queryNotes(mKeyword);
+                        dialog.dismiss();
+                    }
+                })
+                .show();
+    }
+
+    /** Opens an empty note inside the notebook that is currently being displayed. */
+    private void addNote() {
+        Intent addIntent = new Intent(Intent.ACTION_INSERT, getIntent().getData());
+        addIntent.putExtra(EXTRA_NOTEBOOK_ID, mNotebookId);
+        startActivity(addIntent);
+    }
+
+    /** Asks for confirmation, then deletes the note from the list. */
+    private void confirmDeleteNote(final long noteId, String label) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.delete_note_title)
+                .setMessage(getString(R.string.delete_note_message, label))
+                .setPositiveButton(R.string.menu_delete, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        getContentResolver().delete(
+                                ContentUris.withAppendedId(mContentUri, noteId), null, null);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * Asks the user where to save a text file containing every note.
+     */
+    private void exportNotes() {
+        // The Storage Access Framework used below was introduced in Android 4.4.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+            Toast.makeText(this, R.string.export_unsupported, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+                .format(new Date());
+        String fileName = getString(R.string.export_file_prefix) + timestamp + ".txt";
+
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TITLE, fileName);
+        try {
+            startActivityForResult(intent, REQUEST_EXPORT);
+        } catch (ActivityNotFoundException e) {
+            Log.e(TAG, "No activity can create a document", e);
+            Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK
+                && data != null && data.getData() != null) {
+            writeNotesTo(data.getData());
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    /**
+     * Writes every note, with its title and modification time, to the given document URI.
+     *
+     * @param uri The URI of the document the user chose.
+     */
+    private void writeNotesTo(Uri uri) {
+        String[] projection = new String[] {
+                NotePad.Notes.COLUMN_NAME_TITLE,
+                NotePad.Notes.COLUMN_NAME_NOTE,
+                NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE,
+        };
+
+        // Exports only the notebook that is currently displayed.
+        String selection = mNotebookId > 0
+                ? NotePad.Notes.COLUMN_NAME_NOTEBOOK_ID + "=" + mNotebookId
+                : null;
+
+        Cursor cursor = getContentResolver().query(
+                mContentUri, projection, selection, null, NotePad.Notes.DEFAULT_SORT_ORDER);
+        if (cursor == null) {
+            Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        StringBuilder content = new StringBuilder();
+        try {
+            while (cursor.moveToNext()) {
+                String title = cursor.getString(0);
+                String note = cursor.getString(1);
+                long modified = cursor.getLong(2);
+
+                content.append(title).append('\n');
+                content.append(mDateFormat.format(new Date(modified))).append('\n');
+                content.append("----------").append('\n');
+                content.append(note == null ? "" : note).append('\n');
+                content.append('\n');
+            }
+        } finally {
+            cursor.close();
+        }
+
+        OutputStream output = null;
+        try {
+            output = getContentResolver().openOutputStream(uri);
+            if (output == null) {
+                throw new IOException("Unable to open " + uri);
+            }
+            output.write(content.toString().getBytes("UTF-8"));
+            Toast.makeText(this, R.string.export_success, Toast.LENGTH_SHORT).show();
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to export notes to " + uri, e);
+            Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
+        } finally {
+            if (output != null) {
+                try {
+                    output.close();
+                } catch (IOException e) {
+                    Log.w(TAG, "Failed to close " + uri, e);
+                }
+            }
+        }
     }
 
     /**

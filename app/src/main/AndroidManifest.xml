@@ -22,8 +22,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.android.notepad" >
 
+    <!-- Needed to record voice attachments. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application android:icon="@drawable/app_notes"
         android:label="@string/app_name"
+        android:theme="@style/NotePadTheme"
     >
         <provider android:name="NotePadProvider"
             android:authorities="com.google.provider.NotePad"
@@ -31,11 +35,22 @@
             <grant-uri-permission android:pathPattern=".*" />
         </provider>
 
-        <activity android:name="NotesList" android:label="@string/title_notes_list">
+        <!-- The launcher shows the notebooks; tapping one opens its notes. -->
+        <activity android:name="NotebookList"
+            android:label="@string/title_notebook_list">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <!-- Standalone todo page; todos are no longer tied to a single note. -->
+        <activity android:name="TodoList"
+            android:label="@string/title_todo_list" />
+
+        <activity android:name="NotesList"
+            android:label="@string/title_notes_list"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.EDIT" />
@@ -51,9 +66,9 @@
         </activity>
 
         <activity android:name="NoteEditor"
-            android:theme="@android:style/Theme.Holo.Light"
             android:screenOrientation="sensor"
             android:configChanges="keyboardHidden|orientation"
+            android:windowSoftInputMode="adjustResize"
         >
             <!-- This filter says that we can view or edit the data of
                  a single note -->
@@ -81,7 +96,7 @@
         <activity android:name="TitleEditor"
             android:label="@string/title_edit_title"
             android:icon="@drawable/ic_menu_edit"
-            android:theme="@android:style/Theme.Holo.Dialog"
+            android:theme="@style/NotePadDialogTheme"
             android:windowSoftInputMode="stateVisible">
             <!-- This activity implements an alternative action that can be
                  performed on notes: editing their title.  It can be used as
@@ -112,6 +127,18 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Home screen sticky note that shows the latest note. -->
+        <receiver android:name="NoteWidgetProvider"
+            android:label="@string/widget_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.android.notepad.ACTION_NOTES_CHANGED" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/note_widget_info" />
+        </receiver>
 
     </application>
 

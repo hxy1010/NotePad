@@ -18,27 +18,53 @@ package com.example.android.notepad;
 
 import static com.example.android.notepad.R.*;
 
+import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.media.MediaPlayer;
+import android.media.MediaRecorder;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
  * This Activity handles "editing" a note, where editing is responding to
@@ -73,12 +99,31 @@ public class NoteEditor extends Activity {
     private static final int STATE_EDIT = 0;
     private static final int STATE_INSERT = 1;
 
+    /** Request codes for the photo picker and the microphone permission request */
+    private static final int REQUEST_PICK_IMAGE = 10;
+    private static final int REQUEST_RECORD_PERMISSION = 11;
+
+    /** Directory, inside the app's private files, that holds photos and recordings */
+    private static final String ATTACHMENT_DIR = "attachments";
+
     // Global mutable variables
     private int mState;
     private Uri mUri;
     private Cursor mCursor;
     private EditText mText;
     private String mOriginalContent;
+
+    private LinearLayout mPhotoContainer;
+    private LinearLayout mAudioContainer;
+    private TextView mPhotoSection;
+    private TextView mAudioSection;
+    private Button mRecordButton;
+
+    private MediaRecorder mRecorder;
+    private File mRecordingFile;
+    private MediaPlayer mPlayer;
+    /** The audio row that is currently playing, if any. */
+    private TextView mPlayingAudioView;
 
     /**
      * Defines a custom EditText View that draws lines between each line of text that is displayed.
@@ -95,7 +140,8 @@ public class NoteEditor extends Activity {
             mRect = new Rect();
             mPaint = new Paint();
             mPaint.setStyle(Paint.Style.STROKE);
-            mPaint.setColor(0x800000FF);
+            // A faint line that follows the day or night palette.
+            mPaint.setColor(context.getResources().getColor(R.color.editor_line));
         }
 
         /**
@@ -133,6 +179,11 @@ public class NoteEditor extends Activity {
         }
     }
 
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(ThemeUtils.wrap(newBase));
+    }
+
     /**
      * This method is called by Android when the Activity is first started. From the incoming
      * Intent, it determines what kind of editing is desired, and then does it.
@@ -166,9 +217,14 @@ public class NoteEditor extends Activity {
                 || Intent.ACTION_PASTE.equals(action)) {
 
             // Sets the Activity state to INSERT, gets the general note URI, and inserts an
-            // empty record in the provider
+            // empty record in the provider, in the notebook that was opened.
             mState = STATE_INSERT;
-            mUri = getContentResolver().insert(intent.getData(), null);
+            ContentValues insertValues = new ContentValues();
+            long notebookId = intent.getLongExtra(NotesList.EXTRA_NOTEBOOK_ID, -1);
+            if (notebookId > 0) {
+                insertValues.put(NotePad.Notes.COLUMN_NAME_NOTEBOOK_ID, notebookId);
+            }
+            mUri = getContentResolver().insert(intent.getData(), insertValues);
 
             /*
              * If the attempt to insert the new note fails, shuts down this Activity. The
@@ -230,6 +286,9 @@ public class NoteEditor extends Activity {
         // Gets a handle to the EditText in the the layout.
         mText = (EditText) findViewById(R.id.note);
 
+        // Wires up the photo and audio controls.
+        setUpAttachmentViews();
+
         /*
          * If this Activity had stopped previously, its state was written the ORIGINAL_CONTENT
          * location in the saved Instance state. This gets the state.
@@ -258,6 +317,12 @@ public class NoteEditor extends Activity {
         if (mCursor != null) {
             // Requery in case something changed while paused (such as the title)
             mCursor.requery();
+
+            // The note may have been deleted from the list while this screen was paused.
+            if (mCursor.getCount() == 0) {
+                finish();
+                return;
+            }
 
             /* Moves to the first record. Always call moveToFirst() before accessing data in
              * a Cursor for the first time. The semantics of using a Cursor are that when it is
@@ -305,6 +370,9 @@ public class NoteEditor extends Activity {
             setTitle(getText(R.string.error_title));
             mText.setText(getText(R.string.error_message));
         }
+
+        // Displays the photos and recordings that belong to this note.
+        refreshAttachments();
     }
 
     /**
@@ -338,6 +406,15 @@ public class NoteEditor extends Activity {
     protected void onPause() {
         super.onPause();
 
+        // Stops any in-progress recording and releases the audio player.
+        if (mRecorder != null) {
+            stopRecording();
+        }
+        if (mPlayer != null) {
+            mPlayer.release();
+            mPlayer = null;
+        }
+
         /*
          * Tests to see that the query operation didn't fail (see onCreate()). The Cursor object
          * will exist, even if no records were returned, unless the query failed because of some
@@ -354,9 +431,9 @@ public class NoteEditor extends Activity {
              * If the Activity is in the midst of finishing and there is no text in the current
              * note, returns a result of CANCELED to the caller, and deletes the note. This is done
              * even if the note was being edited, the assumption being that the user wanted to
-             * "clear out" (delete) the note.
+             * "clear out" (delete) the note. Notes that only contain attachments are kept.
              */
-            if (isFinishing() && (length == 0)) {
+            if (isFinishing() && (length == 0) && !hasExtras()) {
                 setResult(RESULT_CANCELED);
                 deleteNote();
 
@@ -547,6 +624,11 @@ public class NoteEditor extends Activity {
                         title = title.substring(0, lastSpace);
                     }
                 }
+
+                // Keeps a readable title when the note only contains extras.
+                if (TextUtils.isEmpty(title)) {
+                    title = getString(android.R.string.untitled);
+                }
             }
             // In the values map, sets the value of the title
             values.put(NotePad.Notes.COLUMN_NAME_TITLE, title);
@@ -611,5 +693,548 @@ public class NoteEditor extends Activity {
             getContentResolver().delete(mUri, null, null);
             mText.setText("");
         }
+    }
+
+    /*********************** Attachments (photos and audio) ***********************/
+
+    /**
+     * Finds the attachment views and wires up the two editor buttons.
+     */
+    private void setUpAttachmentViews() {
+        mPhotoContainer = (LinearLayout) findViewById(R.id.photo_container);
+        mAudioContainer = (LinearLayout) findViewById(R.id.audio_container);
+        mPhotoSection = (TextView) findViewById(R.id.section_photos);
+        mAudioSection = (TextView) findViewById(R.id.section_audio);
+        mRecordButton = (Button) findViewById(R.id.btn_record_audio);
+
+        findViewById(R.id.btn_add_photo).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickPhoto();
+            }
+        });
+
+        mRecordButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleRecording();
+            }
+        });
+    }
+
+    /** Refreshes the attachment views. */
+    private void refreshExtras() {
+        refreshAttachments();
+    }
+
+    /** ID of the note currently being edited. */
+    private long getNoteId() {
+        return ContentUris.parseId(mUri);
+    }
+
+    private int dp(int value) {
+        return Math.round(getResources().getDisplayMetrics().density * value);
+    }
+
+    private void refreshAttachments() {
+        stopPlayback();
+        mPhotoContainer.removeAllViews();
+        mAudioContainer.removeAllViews();
+        if (mUri == null) {
+            return;
+        }
+
+        Cursor cursor = getContentResolver().query(
+                NotePad.Attachments.CONTENT_URI,
+                new String[] {
+                        NotePad.Attachments._ID,
+                        NotePad.Attachments.COLUMN_NAME_TYPE,
+                        NotePad.Attachments.COLUMN_NAME_PATH,
+                },
+                NotePad.Attachments.COLUMN_NAME_NOTE_ID + "=?",
+                new String[] { String.valueOf(getNoteId()) },
+                NotePad.Attachments.DEFAULT_SORT_ORDER);
+
+        if (cursor == null) {
+            return;
+        }
+
+        try {
+            while (cursor.moveToNext()) {
+                long attachmentId = cursor.getLong(0);
+                String type = cursor.getString(1);
+                String path = cursor.getString(2);
+                if (path == null) {
+                    continue;
+                }
+                File file = new File(path);
+                if (!file.exists()) {
+                    continue;
+                }
+                if (NotePad.Attachments.TYPE_IMAGE.equals(type)) {
+                    addPhotoView(attachmentId, file);
+                } else if (NotePad.Attachments.TYPE_AUDIO.equals(type)) {
+                    addAudioView(attachmentId, file);
+                }
+            }
+        } finally {
+            cursor.close();
+        }
+
+        mPhotoSection.setVisibility(
+                mPhotoContainer.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+        mAudioSection.setVisibility(
+                mAudioContainer.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    private void addPhotoView(final long attachmentId, final File file) {
+        int size = dp(88);
+
+        // The thumbnail and its delete badge share one square cell.
+        FrameLayout cell = new FrameLayout(this);
+        LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(size, size);
+        cellParams.rightMargin = dp(10);
+        cell.setLayoutParams(cellParams);
+
+        ImageView image = new ImageView(this);
+        image.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        image.setBackgroundResource(R.drawable.bg_photo_frame);
+        image.setPadding(dp(4), dp(4), dp(4), dp(4));
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+
+        Bitmap bitmap = decodeThumbnail(file, dp(80));
+        if (bitmap != null) {
+            image.setImageBitmap(bitmap);
+        }
+
+        image.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showPhoto(file);
+            }
+        });
+
+        image.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                confirmDeleteAttachment(attachmentId, file);
+                return true;
+            }
+        });
+
+        cell.addView(image);
+
+        ImageView delete = new ImageView(this);
+        FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(
+                dp(24), dp(24), android.view.Gravity.TOP | android.view.Gravity.RIGHT);
+        delete.setLayoutParams(badgeParams);
+        delete.setImageResource(R.drawable.ic_cute_close);
+        delete.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                confirmDeleteAttachment(attachmentId, file);
+            }
+        });
+        cell.addView(delete);
+
+        mPhotoContainer.addView(cell);
+    }
+
+    /** Shows a photo enlarged in a dialog, since the file lives in app-private storage. */
+    private void showPhoto(File file) {
+        ImageView image = new ImageView(this);
+        image.setAdjustViewBounds(true);
+        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        Bitmap bitmap = decodeThumbnail(file, dp(800));
+        if (bitmap != null) {
+            image.setImageBitmap(bitmap);
+        }
+
+        new AlertDialog.Builder(this)
+                .setView(image)
+                .setPositiveButton(R.string.button_ok, null)
+                .show();
+    }
+
+    private void addAudioView(final long attachmentId, final File file) {
+        // The row holds the playable name plus a visible delete button.
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = dp(8);
+        row.setLayoutParams(params);
+        row.setBackgroundResource(R.drawable.bg_attachment_row);
+        row.setPadding(dp(12), dp(10), dp(10), dp(10));
+
+        TextView audio = new TextView(this);
+        audio.setText(getString(R.string.audio_label, file.getName()));
+        audio.setCompoundDrawablesWithIntrinsicBounds(
+                R.drawable.ic_cute_play, 0, 0, 0);
+        audio.setCompoundDrawablePadding(dp(10));
+        audio.setTextColor(getResources().getColor(R.color.note_text_primary));
+        audio.setTextSize(15);
+        audio.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        audio.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                playAudio(file, audio);
+            }
+        });
+
+        audio.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                confirmDeleteAttachment(attachmentId, file);
+                return true;
+            }
+        });
+
+        row.addView(audio);
+
+        ImageView delete = new ImageView(this);
+        delete.setLayoutParams(new LinearLayout.LayoutParams(dp(34), dp(34)));
+        delete.setPadding(dp(6), dp(6), dp(6), dp(6));
+        delete.setImageResource(R.drawable.ic_cute_delete);
+        delete.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                confirmDeleteAttachment(attachmentId, file);
+            }
+        });
+        row.addView(delete);
+
+        mAudioContainer.addView(row);
+    }
+
+    /** Decodes a small bitmap so photo thumbnails do not exhaust memory. */
+    private Bitmap decodeThumbnail(File file, int targetSize) {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+
+        int sampleSize = 1;
+        if (bounds.outWidth > 0) {
+            while (bounds.outWidth / sampleSize > targetSize * 2) {
+                sampleSize *= 2;
+            }
+        }
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sampleSize;
+        return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+    }
+
+    private void playAudio(final File file, final TextView view) {
+        stopPlayback();
+
+        if (!file.exists()) {
+            Toast.makeText(this, R.string.audio_missing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final MediaPlayer player = new MediaPlayer();
+        try {
+            player.setDataSource(file.getAbsolutePath());
+            player.prepare();
+            player.start();
+            mPlayer = player;
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to play " + file, e);
+            player.release();
+            Toast.makeText(this, R.string.attachment_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Shows that playback started, so tapping a recording has visible feedback.
+        final CharSequence label = view.getText();
+        view.setTag(label);
+        view.setCompoundDrawablesWithIntrinsicBounds(
+                R.drawable.ic_cute_pause, 0, 0, 0);
+        view.setText(getString(R.string.audio_playing, label));
+        mPlayingAudioView = view;
+
+        player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(MediaPlayer mp) {
+                resetAudioView(view);
+                if (mPlayer == mp) {
+                    mPlayer = null;
+                }
+                mp.release();
+            }
+        });
+
+        player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+            @Override
+            public boolean onError(MediaPlayer mp, int what, int extra) {
+                Log.e(TAG, "Playback error " + what + "/" + extra + " for " + file);
+                Toast.makeText(NoteEditor.this, R.string.audio_broken, Toast.LENGTH_SHORT).show();
+                return false;
+            }
+        });
+    }
+
+    /** Stops whatever recording is playing and restores its row to the idle look. */
+    private void stopPlayback() {
+        if (mPlayer != null) {
+            mPlayer.release();
+            mPlayer = null;
+        }
+        if (mPlayingAudioView != null) {
+            resetAudioView(mPlayingAudioView);
+        }
+    }
+
+    private void resetAudioView(TextView view) {
+        if (view == null) {
+            return;
+        }
+        Object label = view.getTag();
+        if (label != null) {
+            view.setText((CharSequence) label);
+        }
+        view.setCompoundDrawablesWithIntrinsicBounds(
+                R.drawable.ic_cute_play, 0, 0, 0);
+        if (mPlayingAudioView == view) {
+            mPlayingAudioView = null;
+        }
+    }
+
+    private void confirmDeleteAttachment(final long attachmentId, final File file) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.delete_attachment_title)
+                .setMessage(R.string.delete_attachment_message)
+                .setPositiveButton(R.string.menu_delete, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        getContentResolver().delete(
+                                ContentUris.withAppendedId(
+                                        NotePad.Attachments.CONTENT_ID_URI_BASE, attachmentId),
+                                null, null);
+                        file.delete();
+                        refreshAttachments();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void pickPhoto() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("image/*");
+        try {
+            startActivityForResult(intent, REQUEST_PICK_IMAGE);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, R.string.attachment_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_PICK_IMAGE) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                copyPhotoIntoNote(data.getData());
+            }
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    /** Copies the chosen picture into app storage and records it as an attachment. */
+    private void copyPhotoIntoNote(Uri source) {
+        InputStream input = null;
+        FileOutputStream output = null;
+        File target = null;
+
+        try {
+            File dir = new File(getFilesDir(), ATTACHMENT_DIR);
+            if (!dir.exists() && !dir.mkdirs()) {
+                throw new IOException("Unable to create " + dir);
+            }
+            target = new File(dir, "img_" + System.currentTimeMillis() + ".jpg");
+
+            input = getContentResolver().openInputStream(source);
+            if (input == null) {
+                throw new IOException("Unable to open " + source);
+            }
+            output = new FileOutputStream(target);
+
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+            output.flush();
+
+            addAttachment(NotePad.Attachments.TYPE_IMAGE, target.getAbsolutePath());
+            refreshExtras();
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to add photo", e);
+            if (target != null) {
+                target.delete();
+            }
+            Toast.makeText(this, R.string.attachment_failed, Toast.LENGTH_SHORT).show();
+        } finally {
+            closeQuietly(input);
+            closeQuietly(output);
+        }
+    }
+
+    private void closeQuietly(java.io.Closeable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (IOException e) {
+                Log.w(TAG, "Failed to close stream", e);
+            }
+        }
+    }
+
+    private void addAttachment(String type, String path) {
+        if (mUri == null) {
+            return;
+        }
+        ContentValues values = new ContentValues();
+        values.put(NotePad.Attachments.COLUMN_NAME_NOTE_ID, getNoteId());
+        values.put(NotePad.Attachments.COLUMN_NAME_TYPE, type);
+        values.put(NotePad.Attachments.COLUMN_NAME_PATH, path);
+        getContentResolver().insert(NotePad.Attachments.CONTENT_URI, values);
+    }
+
+    /***************************** Voice recording *****************************/
+
+    private void toggleRecording() {
+        if (mRecorder != null) {
+            stopRecording();
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                        != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] { Manifest.permission.RECORD_AUDIO },
+                    REQUEST_RECORD_PERMISSION);
+            return;
+        }
+
+        startRecording();
+    }
+
+    private void startRecording() {
+        File dir = new File(getFilesDir(), ATTACHMENT_DIR);
+        if (!dir.exists() && !dir.mkdirs()) {
+            Toast.makeText(this, R.string.recording_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        File file = new File(dir, "rec_" + System.currentTimeMillis() + ".m4a");
+        MediaRecorder recorder = new MediaRecorder();
+        recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+        recorder.setOutputFile(file.getAbsolutePath());
+
+        try {
+            recorder.prepare();
+            recorder.start();
+            mRecorder = recorder;
+            mRecordingFile = file;
+            mRecordButton.setText(R.string.recording_stop);
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to start recording", e);
+            recorder.release();
+            file.delete();
+            Toast.makeText(this, R.string.recording_failed, Toast.LENGTH_SHORT).show();
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Failed to start recording", e);
+            recorder.release();
+            file.delete();
+            Toast.makeText(this, R.string.recording_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void stopRecording() {
+        MediaRecorder recorder = mRecorder;
+        mRecorder = null;
+        boolean stopped = false;
+
+        if (recorder != null) {
+            try {
+                recorder.stop();
+                stopped = true;
+            } catch (RuntimeException e) {
+                // Thrown when the recording is too short to produce a file.
+                Log.w(TAG, "Recording stopped before any audio was captured", e);
+            } finally {
+                recorder.release();
+            }
+        }
+
+        mRecordButton.setText(R.string.action_voice);
+
+        if (stopped && mRecordingFile != null && mRecordingFile.length() > 0) {
+            addAttachment(NotePad.Attachments.TYPE_AUDIO, mRecordingFile.getAbsolutePath());
+            refreshExtras();
+        } else if (mRecordingFile != null) {
+            mRecordingFile.delete();
+        }
+        mRecordingFile = null;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            int[] grantResults) {
+        if (requestCode == REQUEST_RECORD_PERMISSION) {
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startRecording();
+            } else {
+                Toast.makeText(this, R.string.record_permission_denied,
+                        Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    }
+
+    /** True when the note has at least one attachment. */
+    private boolean hasExtras() {
+        if (mUri == null) {
+            return false;
+        }
+        Cursor cursor = getContentResolver().query(
+                NotePad.Attachments.CONTENT_URI,
+                new String[] { NotePad.Attachments._ID },
+                NotePad.Attachments.COLUMN_NAME_NOTE_ID + "=?",
+                new String[] { String.valueOf(getNoteId()) },
+                null);
+        if (cursor == null) {
+            return false;
+        }
+        try {
+            return cursor.getCount() > 0;
+        } finally {
+            cursor.close();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (mRecorder != null) {
+            mRecorder.release();
+            mRecorder = null;
+        }
+        if (mPlayer != null) {
+            mPlayer.release();
+            mPlayer = null;
+        }
+        super.onDestroy();
     }
 }

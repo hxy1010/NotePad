@@ -18,6 +18,7 @@ package com.example.android.notepad;
 
 import android.app.Activity;
 import android.content.ContentValues;
+import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -57,6 +58,17 @@ public class TitleEditor extends Activity {
 
     // A URI object for the note whose title is being edited.
     private Uri mUri;
+
+    // True when the user pressed cancel, in which case the title must not be saved.
+    private boolean mCancelled;
+
+    /**
+     * Applies the day or night palette before the dialog window is created.
+     */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(ThemeUtils.wrap(newBase));
+    }
 
     /**
      * This method is called by Android when the Activity is first started. From the incoming
@@ -135,7 +147,7 @@ public class TitleEditor extends Activity {
         // Verifies that the query made in onCreate() actually worked. If it worked, then the
         // Cursor object is not null. If it is *empty*, then mCursor.getCount() == 0.
 
-        if (mCursor != null) {
+        if (mCursor != null && !mCancelled) {
 
             // Creates a values map for updating the provider.
             ContentValues values = new ContentValues();
@@ -162,6 +174,18 @@ public class TitleEditor extends Activity {
     }
 
     public void onClickOk(View v) {
+        finish();
+    }
+
+    public void onClickCancel(View v) {
+        mCancelled = true;
+        finish();
+    }
+
+    /** The back key behaves like cancel, so it must not save the title. */
+    @Override
+    public void onBackPressed() {
+        mCancelled = true;
         finish();
     }
 }

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cute note icon with a plus badge, used for "new note". -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFDF8"
+        android:pathData="M6,2.8 L14.8,2.8 L19.2,7.2 L19.2,20.2 A2,2 0 0 1 17.2,22.2 L6,22.2 A2,2 0 0 1 4,20.2 L4,4.8 A2,2 0 0 1 6,2.8 Z" />
+    <path
+        android:fillColor="#FF9FE0CC"
+        android:pathData="M14.8,2.8 L19.2,7.2 L14.8,7.2 Z" />
+
+    <path
+        android:fillColor="#FFFFA9BE"
+        android:pathData="M8.6,14.9 m-1,0 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+    <path
+        android:fillColor="#FFFFA9BE"
+        android:pathData="M14.4,14.9 m-1,0 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+    <path
+        android:fillColor="#FF33405A"
+        android:pathData="M9.6,12.2 m-0.95,0 a0.95,0.95 0 1,0 1.9,0 a0.95,0.95 0 1,0 -1.9,0" />
+    <path
+        android:fillColor="#FF33405A"
+        android:pathData="M13.4,12.2 m-0.95,0 a0.95,0.95 0 1,0 1.9,0 a0.95,0.95 0 1,0 -1.9,0" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M9.8,14.4 Q11.5,15.8 13.2,14.4"
+        android:strokeColor="#FF33405A"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.2" />
+
+    <path
+        android:fillColor="#FF4FBF9F"
+        android:pathData="M18.3,18 m-3.3,0 a3.3,3.3 0 1,0 6.6,0 a3.3,3.3 0 1,0 -6.6,0" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M16.9,18 L19.7,18"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.4" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M18.3,16.6 L18.3,19.4"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.4" />
+</vector>

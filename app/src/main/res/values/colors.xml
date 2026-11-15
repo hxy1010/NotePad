@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Glassmorphism palette, day. The window paints a soft pastel gradient with blurry
+         colour blobs; every card is translucent white so the blobs shine through. -->
+    <color name="glass_bg_start">#FFF8EFF6</color>
+    <color name="glass_bg_end">#FFE6F0FA</color>
+    <color name="glass_blob_pink">#80FFC4D9</color>
+    <color name="glass_blob_violet">#70D6C6FF</color>
+    <color name="glass_blob_mint">#70B5EEDC</color>
+    <color name="glass_blob_sky">#70A6D2FF</color>
+
+    <color name="glass_card_top">#8CFFFFFF</color>
+    <color name="glass_card_bottom">#59FFFFFF</color>
+    <color name="glass_card_top_pressed">#CCFFFFFF</color>
+    <color name="glass_card_bottom_pressed">#A6FFFFFF</color>
+    <color name="glass_stroke">#B3FFFFFF</color>
+    <!-- Almost opaque glass used by floating dialogs so text stays readable. -->
+    <color name="dialog_surface_top">#F7FFFFFF</color>
+    <color name="dialog_surface_bottom">#E6EEF5FF</color>
+    <!-- Dim layer drawn behind the glass dialog card. -->
+    <color name="dialog_scrim">#59000000</color>
+
+    <color name="note_window_background">#00000000</color>
+    <color name="note_item_background">#99FFFFFF</color>
+    <color name="note_search_background">#8CFFFFFF</color>
+    <color name="note_text_primary">#FF2B2F3A</color>
+    <color name="note_text_secondary">#FF5C6474</color>
+    <color name="note_text_time">#FF8A93A3</color>
+    <color name="note_accent">#FF8A5CF6</color>
+    <color name="editor_paper">#B3FFFFFF</color>
+
+    <!-- Application palette -->
+    <color name="app_primary">#D9FFFFFF</color>
+    <color name="app_primary_dark">#FFF1E8F3</color>
+    <color name="app_background">#00000000</color>
+    <color name="card_background">#99FFFFFF</color>
+    <color name="card_stroke">#B3FFFFFF</color>
+    <color name="editor_line">#33626C80</color>
+
+    <color name="accent_soft">#80FFFFFF</color>
+    <color name="accent_soft_pressed">#B3FFFFFF</color>
+    <color name="accent_text">#FF6D4AE0</color>
+
+    <color name="section_label">#FF8A93A3</color>
+
+    <!-- Bottom navigation -->
+    <color name="nav_item_selected">#66C9B6FF</color>
+    <color name="nav_active_text">#FF5B3FBF</color>
+    <color name="nav_inactive_text">#FF8A93A3</color>
+</resources>

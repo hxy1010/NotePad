@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Light, airy theme matched to the pastel glass backdrop. -->
+    <style name="NotePadTheme" parent="@android:style/Theme.Holo.Light">
+        <item name="android:windowBackground">@drawable/bg_app_gradient</item>
+        <item name="android:logo">@drawable/ic_cute_notebook</item>
+        <item name="android:actionBarStyle">@style/NotePadActionBar</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@color/app_primary_dark</item>
+        <item name="android:navigationBarColor">@color/app_primary_dark</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="NotePadActionBar" parent="@android:style/Widget.Holo.Light.ActionBar.Solid">
+        <item name="android:background">@color/app_primary</item>
+        <item name="android:backgroundStacked">@color/app_primary</item>
+        <item name="android:backgroundSplit">@color/app_primary</item>
+    </style>
+
+    <!-- Full-screen translucent window that hosts the floating glass card. -->
+    <style name="NotePadDialogTheme" parent="@android:style/Theme.Holo.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+
+    <!-- Rounded glass button used by the note editor. -->
+    <style name="NotePadActionButton" parent="@android:style/Widget.Holo.Light.Button">
+        <item name="android:background">@drawable/bg_action_button</item>
+        <item name="android:textColor">@color/accent_text</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingLeft">8dp</item>
+        <item name="android:paddingRight">8dp</item>
+    </style>
+
+    <!-- Small caption above the attachment sections. -->
+    <style name="NotePadSectionLabel">
+        <item name="android:textColor">@color/section_label</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:layout_marginTop">16dp</item>
+        <item name="android:layout_marginBottom">6dp</item>
+    </style>
+
+</resources>

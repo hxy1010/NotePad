@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pastel base gradient plus soft radial colour blobs. The blobs have no hard edge, which
+     gives the frosted, out-of-focus backdrop the glass cards sit on. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:startColor="@color/glass_bg_start"
+                android:endColor="@color/glass_bg_end" />
+        </shape>
+    </item>
+
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.18"
+                android:centerY="0.12"
+                android:gradientRadius="340dp"
+                android:startColor="@color/glass_blob_pink"
+                android:endColor="@android:color/transparent" />
+        </shape>
+    </item>
+
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.88"
+                android:centerY="0.22"
+                android:gradientRadius="300dp"
+                android:startColor="@color/glass_blob_violet"
+                android:endColor="@android:color/transparent" />
+        </shape>
+    </item>
+
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.10"
+                android:centerY="0.86"
+                android:gradientRadius="320dp"
+                android:startColor="@color/glass_blob_mint"
+                android:endColor="@android:color/transparent" />
+        </shape>
+    </item>
+
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.92"
+                android:centerY="0.90"
+                android:gradientRadius="300dp"
+                android:startColor="@color/glass_blob_sky"
+                android:endColor="@android:color/transparent" />
+        </shape>
+    </item>
+</layer-list>

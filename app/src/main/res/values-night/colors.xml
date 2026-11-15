@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Glassmorphism palette, night -->
+    <color name="glass_bg_start">#FF0E0B16</color>
+    <color name="glass_bg_end">#FF161B2A</color>
+    <color name="glass_blob_pink">#3D3A1F45</color>
+    <color name="glass_blob_violet">#3D29466E</color>
+    <color name="glass_blob_mint">#3D1B4A46</color>
+    <color name="glass_blob_sky">#3D26507A</color>
+
+    <color name="glass_card_top">#A6242C3C</color>
+    <color name="glass_card_bottom">#7A1C2431</color>
+    <color name="glass_card_top_pressed">#CC2A3446</color>
+    <color name="glass_card_bottom_pressed">#A6202836</color>
+    <color name="glass_stroke">#40FFFFFF</color>
+    <color name="dialog_surface_top">#F2242C3C</color>
+    <color name="dialog_surface_bottom">#F2141B26</color>
+    <color name="dialog_scrim">#8C000000</color>
+
+    <color name="note_window_background">#00000000</color>
+    <color name="note_item_background">#991D2433</color>
+    <color name="note_search_background">#8C1A2130</color>
+    <color name="note_text_primary">#FFF0F1F6</color>
+    <color name="note_text_secondary">#FFB0B7C6</color>
+    <color name="note_text_time">#FF7F8798</color>
+    <color name="note_accent">#FFB49CFF</color>
+    <color name="editor_paper">#991D2433</color>
+
+    <!-- Application palette -->
+    <color name="app_primary">#D91A1F2C</color>
+    <color name="app_primary_dark">#FF0B0E16</color>
+    <color name="app_background">#00000000</color>
+    <color name="card_background">#991D2433</color>
+    <color name="card_stroke">#40FFFFFF</color>
+    <color name="editor_line">#33FFFFFF</color>
+
+    <color name="accent_soft">#33FFFFFF</color>
+    <color name="accent_soft_pressed">#66FFFFFF</color>
+    <color name="accent_text">#FFC9B6FF</color>
+
+    <color name="section_label">#FF9AA3B5</color>
+
+    <!-- Bottom navigation -->
+    <color name="nav_item_selected">#403C2F66</color>
+    <color name="nav_active_text">#FFD9CCFF</color>
+    <color name="nav_inactive_text">#FF7F8798</color>
+</resources>

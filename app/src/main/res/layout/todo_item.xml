@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One todo row: a glass checkbox plus the creation timestamp on the right. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_glass_row"
+    android:gravity="center_vertical"
+    android:minHeight="56dp"
+    android:orientation="horizontal"
+    android:paddingLeft="14dp"
+    android:paddingRight="18dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp" >
+
+    <CheckBox
+        android:id="@+id/todo_check"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="@null"
+        android:textColor="@color/note_text_primary"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/todo_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:textColor="@color/note_text_time"
+        android:singleLine="true" />
+
+    <ImageView
+        android:id="@+id/todo_delete"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_marginLeft="6dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/menu_delete"
+        android:padding="6dp"
+        android:src="@drawable/ic_cute_delete" />
+
+</LinearLayout>

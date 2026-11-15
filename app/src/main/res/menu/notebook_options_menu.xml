@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/menu_add_notebook"
+          android:icon="@drawable/ic_cute_notebook"
+          android:title="@string/menu_new_notebook"
+          android:showAsAction="ifRoom|withText" />
+    <item android:id="@+id/menu_night_mode"
+          android:icon="@drawable/ic_cute_night"
+          android:title="@string/menu_night_mode"
+          android:showAsAction="never" />
+</menu>

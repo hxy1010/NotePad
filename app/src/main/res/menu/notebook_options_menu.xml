@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/menu_filter"
+          android:icon="@drawable/ic_cute_filter"
+          android:title="@string/filter_title"
+          android:showAsAction="ifRoom|withText" />
     <item android:id="@+id/menu_add_notebook"
           android:icon="@drawable/ic_cute_notebook"
           android:title="@string/menu_new_notebook"

@@ -16,6 +16,7 @@
 
 package com.example.android.notepad;
 
+import android.app.ActionBar;
 import android.app.AlertDialog;
 import android.app.ListActivity;
 import android.content.ContentUris;
@@ -58,8 +59,13 @@ public class NotebookList extends ListActivity {
     private static final int MENU_RENAME = Menu.FIRST;
     private static final int MENU_DELETE = Menu.FIRST + 1;
 
+    private static final String STATE_CATEGORY_FILTER = "category_filter";
+
     private SimpleCursorAdapter mAdapter;
     private Cursor mCursor;
+
+    /** Selected notebook category; {@code null} means all categories are shown. */
+    private String mCategoryFilter;
 
     /** Refreshes the list when notebooks or their notes change. */
     private final ContentObserver mObserver = new ContentObserver(new Handler()) {
@@ -77,6 +83,10 @@ public class NotebookList extends ListActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (savedInstanceState != null) {
+            mCategoryFilter = savedInstanceState.getString(STATE_CATEGORY_FILTER);
+        }
 
         setContentView(R.layout.notebook_list);
         getListView().setOnCreateContextMenuListener(this);
@@ -100,14 +110,32 @@ public class NotebookList extends ListActivity {
     protected void onResume() {
         super.onResume();
         queryNotebooks();
+        updateFilterSubtitle();
+    }
+
+    /** Shows the active category under the title so the filter state is always visible. */
+    private void updateFilterSubtitle() {
+        ActionBar bar = getActionBar();
+        if (bar != null) {
+            bar.setSubtitle(mCategoryFilter == null
+                    ? null
+                    : getString(R.string.filter_title_with, mCategoryFilter));
+        }
     }
 
     private void queryNotebooks() {
+        String selection = null;
+        String[] selectionArgs = null;
+        if (mCategoryFilter != null) {
+            selection = NotePad.Notebooks.COLUMN_NAME_CATEGORY + "=?";
+            selectionArgs = new String[] { mCategoryFilter };
+        }
+
         Cursor cursor = getContentResolver().query(
                 NotePad.Notebooks.CONTENT_URI,
                 PROJECTION,
-                null,
-                null,
+                selection,
+                selectionArgs,
                 NotePad.Notebooks.DEFAULT_SORT_ORDER);
 
         if (cursor == null) {
@@ -204,6 +232,12 @@ public class NotebookList extends ListActivity {
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
+        MenuItem filter = menu.findItem(R.id.menu_filter);
+        if (filter != null) {
+            filter.setTitle(getString(R.string.filter_title_with,
+                    mCategoryFilter == null ? getString(R.string.filter_all) : mCategoryFilter));
+        }
+
         MenuItem nightMode = menu.findItem(R.id.menu_night_mode);
         if (nightMode != null) {
             nightMode.setTitle(ThemeUtils.isNightMode(this)
@@ -216,7 +250,10 @@ public class NotebookList extends ListActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.menu_add_notebook) {
+        if (id == R.id.menu_filter) {
+            showFilterDialog();
+            return true;
+        } else if (id == R.id.menu_add_notebook) {
             showNotebookDialog(-1, null, null);
             return true;
         } else if (id == R.id.menu_night_mode) {
@@ -307,6 +344,39 @@ public class NotebookList extends ListActivity {
                             }
                         })
                 .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(STATE_CATEGORY_FILTER, mCategoryFilter);
+    }
+
+    /** Lets the user show notebooks of a single category, or all of them. */
+    private void showFilterDialog() {
+        final String[] categories = getResources().getStringArray(R.array.notebook_categories);
+        final CharSequence[] labels = new CharSequence[categories.length + 1];
+        labels[0] = getString(R.string.filter_all);
+        int checked = 0;
+        for (int i = 0; i < categories.length; i++) {
+            labels[i + 1] = categories[i];
+            if (categories[i].equals(mCategoryFilter)) {
+                checked = i + 1;
+            }
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.filter_title)
+                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mCategoryFilter = which == 0 ? null : categories[which - 1];
+                        queryNotebooks();
+                        updateFilterSubtitle();
+                        dialog.dismiss();
+                    }
+                })
                 .show();
     }
 

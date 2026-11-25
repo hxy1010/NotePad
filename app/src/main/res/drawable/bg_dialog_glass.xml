@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Rounded glass surface used by floating dialogs. -->
+<!-- 悬浮对话框使用的圆角毛玻璃表面。 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <gradient

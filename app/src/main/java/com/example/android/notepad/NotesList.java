@@ -20,9 +20,6 @@ import com.example.android.notepad.NotePad;
 
 import android.app.AlertDialog;
 import android.app.ListActivity;
-import android.content.ActivityNotFoundException;
-import android.content.ClipboardManager;
-import android.content.ClipData;
 import android.content.ComponentName;
 import android.content.ContentUris;
 import android.content.Context;
@@ -31,7 +28,6 @@ import android.content.Intent;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
@@ -49,32 +45,28 @@ import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
 
 /**
- * Displays a list of notes. Will display notes from the {@link Uri}
- * provided in the incoming Intent if there is one, otherwise it defaults to displaying the
- * contents of the {@link NotePadProvider}.
+ * 显示便签列表。如果传入的 Intent 中提供了 {@link Uri}，则显示该 URI 对应的便签，
+ * 否则默认显示 {@link NotePadProvider} 中的内容。
  *
- * NOTE: Notice that the provider operations in this Activity are taking place on the UI thread.
- * This is not a good practice. It is only done here to make the code more readable. A real
- * application should use the {@link android.content.AsyncQueryHandler} or
- * {@link android.os.AsyncTask} object to perform operations asynchronously on a separate thread.
+ * 注意：本 Activity 中的 provider 操作都在 UI 线程上执行。
+ * 这不是好做法，这里只是为了代码更易读。真实应用应使用
+ * {@link android.content.AsyncQueryHandler} 或 {@link android.os.AsyncTask}
+ * 在单独的线程上异步执行这些操作。
  */
 public class NotesList extends ListActivity {
 
-    // For logging and debugging
+    // 用于日志记录和调试
     private static final String TAG = "NotesList";
 
     /**
-     * The columns needed by the cursor adapter
+     * cursor 适配器所需的列
      */
     private static final String[] PROJECTION = new String[] {
             NotePad.Notes._ID, // 0
@@ -83,73 +75,78 @@ public class NotesList extends ListActivity {
             NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE, // 3
     };
 
-    /** The index of the title column */
+    /** 标题列的索引 */
     private static final int COLUMN_INDEX_TITLE = 1;
 
-    /** The cursor columns displayed by the list item layout */
+    /** 列表项布局中要显示的 cursor 列 */
     private static final String[] FROM_COLUMNS = new String[] {
             NotePad.Notes.COLUMN_NAME_TITLE,
             NotePad.Notes.COLUMN_NAME_NOTE,
             NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE,
     };
 
-    /** The views of {@link R.layout#noteslist_item} that display FROM_COLUMNS */
+    /** {@link R.layout#noteslist_item} 中用于显示 FROM_COLUMNS 的视图 */
     private static final int[] TO_VIEWS = new int[] {
             R.id.note_title,
             R.id.note_preview,
             R.id.note_time,
     };
 
-    /** Request code used when asking the user where to save the exported notes */
-    private static final int REQUEST_EXPORT = 1;
-
-    /** Intent extra: ID of the notebook whose notes are displayed */
+    /** Intent extra：所显示便签所属笔记本的 ID */
     public static final String EXTRA_NOTEBOOK_ID = "notebook_id";
 
-    /** Intent extra: name of the notebook whose notes are displayed */
+    /** Intent extra：所显示便签所属笔记本的名称 */
     public static final String EXTRA_NOTEBOOK_NAME = "notebook_name";
 
-    /** The notebook being displayed, or -1 when the activity lists notes from every notebook */
+    /** Intent extra：是否只显示未归类的小记 */
+    public static final String EXTRA_UNCLASSIFIED = "unclassified";
+
+    /** 正在显示的笔记本；当 Activity 列出所有笔记本的便签时为 -1 */
     private long mNotebookId = -1;
 
-    /** Backs the note list */
+    /** 是否只显示未归类的小记（不属于任何笔记本） */
+    private boolean mUnclassifiedOnly;
+
+    /** 为便签列表提供数据 */
     private SimpleCursorAdapter mAdapter;
 
-    /** The cursor currently displayed by mAdapter, so it can be closed in onDestroy() */
+    /** mAdapter 当前显示的 cursor，以便在 onDestroy() 中关闭 */
     private Cursor mCursor;
 
-    /** The URI of the notes directory being displayed */
+    /** 正在显示的便签目录的 URI */
     private Uri mContentUri;
 
-    /** The search keyword currently filtering the list, or "" when not searching */
+    /** 当前用于过滤列表的搜索关键词，未搜索时为 "" */
     private String mKeyword = "";
 
-    /** Preferences shared with the theme switcher */
+    /** 与主题切换器共用的偏好设置 */
     private static final String PREF_NAME = "notepad_prefs";
     private static final String PREF_SORT_ORDER = "note_sort_order";
 
-    /** Sort orders offered by the sort dialog */
+    /** 排序对话框中提供的排序方式 */
     private static final String[] SORT_ORDERS = new String[] {
+            NotePad.Notes.COLUMN_NAME_TITLE + " COLLATE NOCASE DESC",
+            NotePad.Notes.COLUMN_NAME_TITLE + " COLLATE NOCASE ASC",
             NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " DESC",
             NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " ASC",
-            NotePad.Notes.COLUMN_NAME_TITLE + " COLLATE NOCASE ASC",
-            NotePad.Notes.COLUMN_NAME_TITLE + " COLLATE NOCASE DESC",
     };
 
-    /** Labels shown by the sort dialog, matching SORT_ORDERS */
+    /** 排序对话框中显示的标签，与 SORT_ORDERS 一一对应 */
     private static final int[] SORT_LABELS = new int[] {
+            R.string.sort_title_desc,
+            R.string.sort_title_asc,
             R.string.sort_modified_desc,
             R.string.sort_modified_asc,
-            R.string.sort_title_asc,
-            R.string.sort_title_desc,
     };
 
-    /** The currently selected sort order */
-    private String mSortOrder = SORT_ORDERS[0];
+    /** 默认排序方式在 SORT_ORDERS 中的下标：修改时间降序 */
+    private static final int DEFAULT_SORT_INDEX = 2;
+
+    /** 当前选中的排序方式 */
+    private String mSortOrder = SORT_ORDERS[DEFAULT_SORT_INDEX];
 
     /**
-     * Re-queries the list whenever a note is inserted, updated or deleted, so the list stays
-     * in sync with the provider.
+     * 每当便签被插入、更新或删除时重新查询列表，使列表与 provider 保持同步。
      */
     private final ContentObserver mObserver = new ContentObserver(new Handler()) {
         @Override
@@ -158,7 +155,7 @@ public class NotesList extends ListActivity {
         }
     };
 
-    /** Formats the modification timestamp shown in the list */
+    /** 格式化列表中显示的修改时间 */
     private final SimpleDateFormat mDateFormat =
             new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
 
@@ -168,41 +165,46 @@ public class NotesList extends ListActivity {
     }
 
     /**
-     * onCreate is called when Android starts this Activity from scratch.
+     * Android 从头启动此 Activity 时会调用 onCreate。
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // The user does not need to hold down the key to use menu shortcuts.
+        // 用户无需按住功能键即可使用菜单快捷键。
         setDefaultKeyMode(DEFAULT_KEYS_SHORTCUT);
 
-        /* If no data is given in the Intent that started this Activity, then this Activity
-         * was started when the intent filter matched a MAIN action. We should use the default
-         * provider URI.
+        /* 如果启动此 Activity 的 Intent 中没有提供数据，则说明此 Activity 是在
+         * intent filter 匹配到 MAIN action 时启动的。此时应使用默认的 provider URI。
          */
-        // Gets the intent that started this Activity.
+        // 获取启动此 Activity 的 intent。
         Intent intent = getIntent();
 
-        // If there is no data associated with the Intent, sets the data to the default URI, which
-        // accesses a list of notes.
+        // 如果 Intent 中没有关联数据，则将数据设为默认 URI，该 URI 访问便签列表。
         if (intent.getData() == null) {
             intent.setData(NotePad.Notes.CONTENT_URI);
         }
         mContentUri = intent.getData();
 
-        // Shows only the notes of the requested notebook.
+        // 仅显示所请求笔记本的便签。
         mNotebookId = intent.getLongExtra(EXTRA_NOTEBOOK_ID, -1);
+        mUnclassifiedOnly = intent.getBooleanExtra(EXTRA_UNCLASSIFIED, false);
         String notebookName = intent.getStringExtra(EXTRA_NOTEBOOK_NAME);
         if (notebookName != null) {
             setTitle(notebookName);
+        } else if (mUnclassifiedOnly) {
+            // 从首页「最近小记」的「全部」进入时，只列出未归类的小记。
+            setTitle(R.string.title_all_quick_notes);
+        } else if (mNotebookId <= 0) {
+            // 未指定笔记簿时显示全部笔记，包括未归类的小记。
+            setTitle(R.string.title_all_notes);
         }
 
-        // Inflates a layout that contains a search box, the list of notes and an empty view.
+        // 填充包含搜索框、便签列表和空状态视图的布局。
         setContentView(R.layout.notes_list);
         BottomNav.bind(this, true);
 
-        // The empty state offers a real button so the hint and the action match.
+        // 空状态提供一个真实按钮，使提示与操作相对应。
         findViewById(R.id.empty_new_note).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -211,13 +213,13 @@ public class NotesList extends ListActivity {
         });
 
         /*
-         * Sets the callback for context menu activation for the ListView. The listener is set
-         * to be this Activity. The effect is that context menus are enabled for items in the
-         * ListView, and the context menu is handled by a method in NotesList.
+         * 设置 ListView 上下文菜单激活时的回调。监听器被设为该 Activity，
+         * 效果是为 ListView 中的项启用上下文菜单，且上下文菜单由 NotesList 中的
+         * 方法来处理。
          */
         getListView().setOnCreateContextMenuListener(this);
 
-        // Filters the list while the user types a title or content keyword.
+        // 用户输入标题或内容关键词时过滤列表。
         EditText searchInput = (EditText) findViewById(R.id.search_input);
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override
@@ -235,22 +237,22 @@ public class NotesList extends ListActivity {
             }
         });
 
-        // Watches the provider so the list refreshes when notes are added, edited or deleted.
+        // 监听 provider，使便签被新增、编辑或删除时列表自动刷新。
         getContentResolver().registerContentObserver(mContentUri, true, mObserver);
 
-        // Restores the order the user picked last time.
+        // 恢复用户上次选择的排序方式。
         mSortOrder = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
-                .getString(PREF_SORT_ORDER, SORT_ORDERS[0]);
+                .getString(PREF_SORT_ORDER, SORT_ORDERS[DEFAULT_SORT_INDEX]);
 
-        // Shows every note until the user starts searching.
+        // 在用户开始搜索前显示所有便签。
         queryNotes(null);
     }
 
     /**
-     * Queries the notes provider and updates the list. If keyword is not empty, only notes whose
-     * title or content contains it are shown.
+     * 查询便签 provider 并更新列表。如果 keyword 不为空，则只显示标题或内容
+     * 包含该关键词的便签。
      *
-     * @param keyword The text to search for, or null to display every note.
+     * @param keyword 要搜索的文本；传 null 则显示所有便签。
      */
     private void queryNotes(String keyword) {
         String selection = null;
@@ -266,10 +268,14 @@ public class NotesList extends ListActivity {
             }
         }
 
-        // Restricts the list to the notebook that was opened from the notebook list.
+        // 将列表限制为从笔记本列表打开的那个笔记本。
         if (mNotebookId > 0) {
             String notebookSelection = NotePad.Notes.COLUMN_NAME_NOTEBOOK_ID + "=" + mNotebookId;
             selection = selection == null ? notebookSelection : notebookSelection + " AND " + selection;
+        } else if (mUnclassifiedOnly) {
+            // 「全部小记」只显示未归类的小记。
+            String unclassifiedSelection = NotePad.Notes.COLUMN_NAME_NOTEBOOK_ID + " IS NULL";
+            selection = selection == null ? unclassifiedSelection : unclassifiedSelection + " AND " + selection;
         }
 
         Cursor cursor = getContentResolver().query(
@@ -286,32 +292,40 @@ public class NotesList extends ListActivity {
         }
 
         if (mAdapter == null) {
-            // Creates the backing adapter for the ListView.
+            // 为 ListView 创建后台适配器。
             mAdapter = new SimpleCursorAdapter(
-                    this,                       // The Context for the ListView
-                    R.layout.noteslist_item,    // Points to the XML for a list item
-                    cursor,                     // The cursor to get items from
+                    this,                       // ListView 所用的 Context
+                    R.layout.noteslist_item,    // 指向列表项的 XML
+                    cursor,                     // 从中获取条目的 cursor
                     FROM_COLUMNS,
                     TO_VIEWS
             );
 
-            // Formats the note preview and the modification timestamp.
+            // 格式化便签预览和修改时间。
             mAdapter.setViewBinder(new SimpleCursorAdapter.ViewBinder() {
                 @Override
                 public boolean setViewValue(View view, Cursor c, int columnIndex) {
                     String columnName = c.getColumnName(columnIndex);
 
-                    if (NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE.equals(columnName)) {
+                    if (NotePad.Notes.COLUMN_NAME_TITLE.equals(columnName)) {
+                        // 没有标题时用正文开头代替，方便辨认笔记。
+                        String title = c.getString(columnIndex);
+                        String note = c.getString(
+                                c.getColumnIndex(NotePad.Notes.COLUMN_NAME_NOTE));
+                        ((TextView) view).setText(displayTitle(title, note));
+                        return true;
+                    } else if (NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE.equals(columnName)) {
                         long modified = c.getLong(columnIndex);
                         ((TextView) view).setText(mDateFormat.format(new Date(modified)));
 
-                        // Wires the trash icon of this row to the delete dialog.
+                        // 把该行的垃圾桶图标连接到删除对话框。
                         final long noteId = c.getLong(
                                 c.getColumnIndex(NotePad.Notes._ID));
                         String title = c.getString(
                                 c.getColumnIndex(NotePad.Notes.COLUMN_NAME_TITLE));
-                        final String label = TextUtils.isEmpty(title)
-                                ? getString(R.string.note_untitled) : title;
+                        String note = c.getString(
+                                c.getColumnIndex(NotePad.Notes.COLUMN_NAME_NOTE));
+                        final String label = displayTitle(title, note);
                         View row = (View) view.getParent();
                         if (row != null) {
                             View delete = row.findViewById(R.id.note_delete);
@@ -328,7 +342,7 @@ public class NotesList extends ListActivity {
                     } else if (NotePad.Notes.COLUMN_NAME_NOTE.equals(columnName)) {
                         String note = c.getString(columnIndex);
                         if (note != null) {
-                            // Keeps the preview on a single line.
+                            // 保持预览只占一行。
                             note = note.replace('\n', ' ').trim();
                         }
                         ((TextView) view).setText(note);
@@ -338,21 +352,36 @@ public class NotesList extends ListActivity {
                 }
             });
 
-            // Sets the ListView's adapter to be the cursor adapter that was just created.
+            // 把 ListView 的适配器设为刚创建的 cursor 适配器。
             setListAdapter(mAdapter);
             mCursor = cursor;
         } else {
-            // Closes the previous cursor and displays the new results.
+            // 关闭先前的 cursor 并显示新结果。
             mAdapter.changeCursor(cursor);
             mCursor = cursor;
         }
 
-        // Updates the empty view so it explains why the list is empty.
+        // 更新空状态视图，说明列表为空的原因。
         TextView emptyView = (TextView) findViewById(R.id.empty_hint);
         if (emptyView != null) {
             boolean searching = keyword != null && keyword.trim().length() > 0;
             emptyView.setText(searching ? R.string.search_no_result : R.string.list_empty);
         }
+    }
+
+    /** 有标题时显示标题；没有标题时用正文开头代替，最多保留 20 个字。 */
+    private String displayTitle(String title, String note) {
+        if (!TextUtils.isEmpty(title)) {
+            return title;
+        }
+        if (TextUtils.isEmpty(note)) {
+            return getString(R.string.note_untitled);
+        }
+        String text = note.replace('\n', ' ').trim();
+        if (text.length() > 20) {
+            text = text.substring(0, 20) + "…";
+        }
+        return text;
     }
 
     @Override
@@ -366,28 +395,27 @@ public class NotesList extends ListActivity {
     }
 
     /**
-     * Called when the user clicks the device's Menu button the first time for
-     * this Activity. Android passes in a Menu object that is populated with items.
+     * 用户首次点击设备的 Menu 按钮时调用。Android 会传入一个已填充
+     * 菜单项的 Menu 对象。
      *
-     * Sets up a menu that provides the Insert option plus a list of alternative actions for
-     * this Activity. Other applications that want to handle notes can "register" themselves in
-     * Android by providing an intent filter that includes the category ALTERNATIVE and the
-     * mimeTYpe NotePad.Notes.CONTENT_TYPE. If they do this, the code in onCreateOptionsMenu()
-     * will add the Activity that contains the intent filter to its list of options. In effect,
-     * the menu will offer the user other applications that can handle notes.
-     * @param menu A Menu object, to which menu items should be added.
-     * @return True, always. The menu should be displayed.
+     * 设置一个菜单，提供 Insert 选项以及适用于此 Activity 的一批替代操作。
+     * 其他想要处理便签的应用，可以在 Android 中通过提供包含 ALTERNATIVE 类别和
+     * mimeTYpe NotePad.Notes.CONTENT_TYPE 的 intent filter 来“注册”自己。
+     * 如果它们这样做了，onCreateOptionsMenu() 中的代码会把包含该 intent filter
+     * 的 Activity 加入其选项列表。实际效果是，菜单会向用户提供其他可以处理
+     * 便签的应用。
+     * @param menu Menu 对象，应向其中添加菜单项。
+     * @return 始终返回 true。菜单应当显示。
      */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate menu from XML resource
+        // 从 XML 资源填充菜单
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.list_options_menu, menu);
 
-        // Generate any additional actions that can be performed on the
-        // overall list.  In a normal install, there are no additional
-        // actions found here, but this allows other applications to extend
-        // our menu with their own actions.
+        // 生成可对整个列表执行的额外操作。在常规安装中，这里
+        // 不会找到额外操作，但这允许其他应用用自己的操作
+        // 扩展我们的菜单。
         Intent intent = new Intent(null, getIntent().getData());
         intent.addCategory(Intent.CATEGORY_ALTERNATIVE);
         menu.addIntentOptions(Menu.CATEGORY_ALTERNATIVE, 0, 0,
@@ -400,116 +428,83 @@ public class NotesList extends ListActivity {
     public boolean onPrepareOptionsMenu(Menu menu) {
         super.onPrepareOptionsMenu(menu);
 
-        // The paste menu item is enabled if there is data on the clipboard.
-        ClipboardManager clipboard = (ClipboardManager)
-                getSystemService(Context.CLIPBOARD_SERVICE);
-
-
-        MenuItem mPasteItem = menu.findItem(R.id.menu_paste);
-
-        // If the clipboard contains an item, enables the Paste option on the menu.
-        if (clipboard.hasPrimaryClip()) {
-            mPasteItem.setEnabled(true);
-        } else {
-            // If the clipboard is empty, disables the menu's Paste option.
-            mPasteItem.setEnabled(false);
-        }
-
-        // Gets the number of notes currently being displayed.
+        // 获取当前显示的便签数量。
         final boolean haveItems = getListAdapter().getCount() > 0;
 
-        // If there are any notes in the list (which implies that one of
-        // them is selected), then we need to generate the actions that
-        // can be performed on the current selection.  This will be a combination
-        // of our own specific actions along with any extensions that can be
-        // found.
+        // 如果列表中有便签（这意味着选中了其中一条），则需要生成
+        // 可对当前选中项执行的操作。这些操作将由我们自己的具体操作
+        // 以及找到的所有扩展操作组合而成。
         if (haveItems) {
 
-            // This is the selected item.
+            // 这是被选中的项。
             Uri uri = ContentUris.withAppendedId(getIntent().getData(), getSelectedItemId());
 
-            // Creates an array of Intents with one element. This will be used to send an Intent
-            // based on the selected menu item.
+            // 创建一个只含一个元素的 Intent 数组。用于根据选中的菜单项
+            // 发送 Intent。
             Intent[] specifics = new Intent[1];
 
-            // Sets the Intent in the array to be an EDIT action on the URI of the selected note.
+            // 把数组中的 Intent 设为对选中便签 URI 执行 EDIT 操作。
             specifics[0] = new Intent(Intent.ACTION_EDIT, uri);
 
-            // Creates an array of menu items with one element. This will contain the EDIT option.
+            // 创建一个只含一个元素的菜单项数组。其中将包含 EDIT 选项。
             MenuItem[] items = new MenuItem[1];
 
-            // Creates an Intent with no specific action, using the URI of the selected note.
+            // 使用选中便签的 URI 创建一个没有指定 action 的 Intent。
             Intent intent = new Intent(null, uri);
 
-            /* Adds the category ALTERNATIVE to the Intent, with the note ID URI as its
-             * data. This prepares the Intent as a place to group alternative options in the
-             * menu.
+            /* 向 Intent 添加 ALTERNATIVE 类别，以便签 ID URI 作为其数据。
+             * 这样就把该 Intent 准备为菜单中分组替代选项的容器。
              */
             intent.addCategory(Intent.CATEGORY_ALTERNATIVE);
 
             /*
-             * Add alternatives to the menu
+             * 向菜单添加替代选项
              */
             menu.addIntentOptions(
-                Menu.CATEGORY_ALTERNATIVE,  // Add the Intents as options in the alternatives group.
-                Menu.NONE,                  // A unique item ID is not required.
-                Menu.NONE,                  // The alternatives don't need to be in order.
-                null,                       // The caller's name is not excluded from the group.
-                specifics,                  // These specific options must appear first.
-                intent,                     // These Intent objects map to the options in specifics.
-                Menu.NONE,                  // No flags are required.
-                items                       // The menu items generated from the specifics-to-
-                                            // Intents mapping
+                Menu.CATEGORY_ALTERNATIVE,  // 把 Intent 作为选项添加到 alternatives 分组中。
+                Menu.NONE,                  // 不需要唯一的菜单项 ID。
+                Menu.NONE,                  // 替代选项无需排序。
+                null,                       // 调用方的名称不从分组中排除。
+                specifics,                  // 这些具体选项必须排在最前面。
+                intent,                     // 这些 Intent 对象映射到 specifics 中的选项。
+                Menu.NONE,                  // 不需要标志位。
+                items                       // 由 specifics 到 Intent 的映射生成的菜单项
             );
-                // If the Edit menu item exists, adds shortcuts for it.
+                // 如果存在 Edit 菜单项，则为其添加快捷键。
                 if (items[0] != null) {
 
-                    // Sets the Edit menu item shortcut to numeric "1", letter "e"
+                    // 把 Edit 菜单项的快捷键设为数字 "1"、字母 "e"
                     items[0].setShortcut('1', 'e');
                 }
             } else {
-                // If the list is empty, removes any existing alternative actions from the menu
+                // 如果列表为空，则从菜单中移除已有的替代操作
                 menu.removeGroup(Menu.CATEGORY_ALTERNATIVE);
             }
 
-        // Displays the menu
+        // 显示菜单
         return true;
     }
 
     /**
-     * This method is called when the user selects an option from the menu, but no item
-     * in the list is selected. If the option was INSERT, then a new Intent is sent out with action
-     * ACTION_INSERT. The data from the incoming Intent is put into the new Intent. In effect,
-     * this triggers the NoteEditor activity in the NotePad application.
+     * 用户从菜单中选择一个选项、但列表中没有选中任何项时调用此方法。
+     * 如果选的是 INSERT，则发送一个 action 为 ACTION_INSERT 的新 Intent，
+     * 传入 Intent 中的数据会被放入这个新 Intent。实际效果是触发 NotePad 应用中的
+     * NoteEditor activity。
      *
-     * If the item was not INSERT, then most likely it was an alternative option from another
-     * application. The parent method is called to process the item.
-     * @param item The menu item that was selected by the user
-     * @return True, if the INSERT menu item was selected; otherwise, the result of calling
-     * the parent method.
+     * 如果选中的不是 INSERT，则很可能是来自其他应用的替代选项。此时调用
+     * 父类方法来处理该项。
+     * @param item 用户选中的菜单项
+     * @return 如果选中的是 INSERT 菜单项则返回 true；否则返回调用父类方法的结果。
      */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.menu_add) {
             /*
-             * Launches a new Activity using an Intent. The intent filter for the Activity
-             * has to have action ACTION_INSERT. No category is set, so DEFAULT is assumed.
-             * In effect, this starts the NoteEditor Activity in NotePad.
+             * 使用 Intent 启动新的 Activity。该 Activity 的 intent filter 必须包含
+             * action ACTION_INSERT。没有设置类别，因此默认按 DEFAULT 处理。
+             * 实际效果是启动 NotePad 中的 NoteEditor Activity。
              */
             addNote();
-            return true;
-        } else if (item.getItemId() == R.id.menu_paste) {
-            /*
-             * Launches a new Activity using an Intent. The intent filter for the Activity
-             * has to have action ACTION_PASTE. No category is set, so DEFAULT is assumed.
-             * In effect, this starts the NoteEditor Activity in NotePad.
-             */
-            Intent pasteIntent = new Intent(Intent.ACTION_PASTE, getIntent().getData());
-            pasteIntent.putExtra(EXTRA_NOTEBOOK_ID, mNotebookId);
-            startActivity(pasteIntent);
-            return true;
-        } else if (item.getItemId() == R.id.menu_export) {
-            exportNotes();
             return true;
         } else if (item.getItemId() == R.id.menu_sort) {
             showSortDialog();
@@ -518,7 +513,7 @@ public class NotesList extends ListActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    /** Lets the user pick how notes are ordered and remembers the choice. */
+    /** 让用户选择便签的排序方式，并记住该选择。 */
     private void showSortDialog() {
         int checked = 0;
         for (int i = 0; i < SORT_ORDERS.length; i++) {
@@ -547,14 +542,14 @@ public class NotesList extends ListActivity {
                 .show();
     }
 
-    /** Opens an empty note inside the notebook that is currently being displayed. */
+    /** 在当前显示的笔记本中打开一条空便签。 */
     private void addNote() {
         Intent addIntent = new Intent(Intent.ACTION_INSERT, getIntent().getData());
         addIntent.putExtra(EXTRA_NOTEBOOK_ID, mNotebookId);
         startActivity(addIntent);
     }
 
-    /** Asks for confirmation, then deletes the note from the list. */
+    /** 请求确认，然后从列表中删除该便签。 */
     private void confirmDeleteNote(final long noteId, String label) {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.delete_note_title)
@@ -566,165 +561,63 @@ public class NotesList extends ListActivity {
                                 ContentUris.withAppendedId(mContentUri, noteId), null, null);
                     }
                 })
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton(R.string.button_cancel, null)
                 .show();
     }
 
     /**
-     * Asks the user where to save a text file containing every note.
-     */
-    private void exportNotes() {
-        // The Storage Access Framework used below was introduced in Android 4.4.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
-            Toast.makeText(this, R.string.export_unsupported, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
-                .format(new Date());
-        String fileName = getString(R.string.export_file_prefix) + timestamp + ".txt";
-
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("text/plain");
-        intent.putExtra(Intent.EXTRA_TITLE, fileName);
-        try {
-            startActivityForResult(intent, REQUEST_EXPORT);
-        } catch (ActivityNotFoundException e) {
-            Log.e(TAG, "No activity can create a document", e);
-            Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK
-                && data != null && data.getData() != null) {
-            writeNotesTo(data.getData());
-            return;
-        }
-        super.onActivityResult(requestCode, resultCode, data);
-    }
-
-    /**
-     * Writes every note, with its title and modification time, to the given document URI.
+     * 用户在列表中上下文点击（右键）某条便签时调用。NotesList 把自己的 ListView
+     * 注册为上下文菜单的处理者（这在 onCreate() 中完成）。
      *
-     * @param uri The URI of the document the user chose.
-     */
-    private void writeNotesTo(Uri uri) {
-        String[] projection = new String[] {
-                NotePad.Notes.COLUMN_NAME_TITLE,
-                NotePad.Notes.COLUMN_NAME_NOTE,
-                NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE,
-        };
-
-        // Exports only the notebook that is currently displayed.
-        String selection = mNotebookId > 0
-                ? NotePad.Notes.COLUMN_NAME_NOTEBOOK_ID + "=" + mNotebookId
-                : null;
-
-        Cursor cursor = getContentResolver().query(
-                mContentUri, projection, selection, null, NotePad.Notes.DEFAULT_SORT_ORDER);
-        if (cursor == null) {
-            Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        StringBuilder content = new StringBuilder();
-        try {
-            while (cursor.moveToNext()) {
-                String title = cursor.getString(0);
-                String note = cursor.getString(1);
-                long modified = cursor.getLong(2);
-
-                content.append(title).append('\n');
-                content.append(mDateFormat.format(new Date(modified))).append('\n');
-                content.append("----------").append('\n');
-                content.append(note == null ? "" : note).append('\n');
-                content.append('\n');
-            }
-        } finally {
-            cursor.close();
-        }
-
-        OutputStream output = null;
-        try {
-            output = getContentResolver().openOutputStream(uri);
-            if (output == null) {
-                throw new IOException("Unable to open " + uri);
-            }
-            output.write(content.toString().getBytes("UTF-8"));
-            Toast.makeText(this, R.string.export_success, Toast.LENGTH_SHORT).show();
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to export notes to " + uri, e);
-            Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
-        } finally {
-            if (output != null) {
-                try {
-                    output.close();
-                } catch (IOException e) {
-                    Log.w(TAG, "Failed to close " + uri, e);
-                }
-            }
-        }
-    }
-
-    /**
-     * This method is called when the user context-clicks a note in the list. NotesList registers
-     * itself as the handler for context menus in its ListView (this is done in onCreate()).
+     * 可用的选项只有 OPEN 和 DELETE。
      *
-     * The only available options are COPY and DELETE.
+     * 上下文点击等同于长按。
      *
-     * Context-click is equivalent to long-press.
-     *
-     * @param menu A ContexMenu object to which items should be added.
-     * @param view The View for which the context menu is being constructed.
-     * @param menuInfo Data associated with view.
+     * @param menu 应向其添加菜单项的 ContexMenu 对象。
+     * @param view 正在为其构建上下文菜单的 View。
+     * @param menuInfo 与 view 关联的数据。
      * @throws ClassCastException
      */
     @Override
     public void onCreateContextMenu(ContextMenu menu, View view, ContextMenuInfo menuInfo) {
 
-        // The data from the menu item.
+        // 来自菜单项的数据。
         AdapterView.AdapterContextMenuInfo info;
 
-        // Tries to get the position of the item in the ListView that was long-pressed.
+        // 尝试获取 ListView 中被长按项的位置。
         try {
-            // Casts the incoming data object into the type for AdapterView objects.
+            // 把传入的数据对象转换为 AdapterView 对象对应的类型。
             info = (AdapterView.AdapterContextMenuInfo) menuInfo;
         } catch (ClassCastException e) {
-            // If the menu object can't be cast, logs an error.
+            // 如果菜单对象无法转换，则记录错误。
             Log.e(TAG, "bad menuInfo", e);
             return;
         }
 
         /*
-         * Gets the data associated with the item at the selected position. getItem() returns
-         * whatever the backing adapter of the ListView has associated with the item. In NotesList,
-         * the adapter associated all of the data for a note with its list item. As a result,
-         * getItem() returns that data as a Cursor.
+         * 获取与所选位置处项关联的数据。getItem() 返回 ListView 的后台适配器
+         * 为该条目关联的内容。在 NotesList 中，适配器把便签的所有数据都关联到了
+         * 其列表项上。因此 getItem() 会把这些数据作为 Cursor 返回。
          */
         Cursor cursor = (Cursor) getListAdapter().getItem(info.position);
 
-        // If the cursor is empty, then for some reason the adapter can't get the data from the
-        // provider, so returns null to the caller.
+        // 如果 cursor 为空，则说明适配器因某种原因无法从 provider 获取数据，
+        // 此时向调用方返回 null。
         if (cursor == null) {
-            // For some reason the requested item isn't available, do nothing
+            // 所请求的项因某种原因不可用，不做任何处理
             return;
         }
 
-        // Inflate menu from XML resource
+        // 从 XML 资源填充菜单
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.list_context_menu, menu);
 
-        // Sets the menu header to be the title of the selected note.
+        // 把菜单标题设为所选便签的标题。
         menu.setHeaderTitle(cursor.getString(COLUMN_INDEX_TITLE));
 
-        // Append to the
-        // menu items for any other activities that can do stuff with it
-        // as well.  This does a query on the system for any activities that
-        // implement the ALTERNATIVE_ACTION for our data, adding a menu item
-        // for each one that is found.
+        // 追加其他可以对本便签执行操作的 Activity 的菜单项。
+        // 这会在系统中查询实现了我们数据 ALTERNATIVE_ACTION 的
+        // Activity，并为每个找到的 Activity 添加一个菜单项。
         Intent intent = new Intent(null, Uri.withAppendedPath(getIntent().getData(), 
                                         Integer.toString((int) info.id) ));
         intent.addCategory(Intent.CATEGORY_ALTERNATIVE);
@@ -734,115 +627,97 @@ public class NotesList extends ListActivity {
     }
 
     /**
-     * This method is called when the user selects an item from the context menu
-     * (see onCreateContextMenu()). The only menu items that are actually handled are DELETE and
-     * COPY. Anything else is an alternative option, for which default handling should be done.
+     * 用户从上下文菜单中选择一项时调用（参见 onCreateContextMenu()）。实际处理的
+     * 菜单项只有 DELETE。其他项都是替代选项，应进行默认处理。
      *
-     * @param item The selected menu item
-     * @return True if the menu item was DELETE, and no default processing is need, otherwise false,
-     * which triggers the default handling of the item.
+     * @param item 被选中的菜单项
+     * @return 如果菜单项是 DELETE 且无需默认处理则返回 true；否则返回 false，
+     * 从而触发该菜单项的默认处理。
      * @throws ClassCastException
      */
     @Override
     public boolean onContextItemSelected(MenuItem item) {
-        // The data from the menu item.
+        // 来自菜单项的数据。
         AdapterView.AdapterContextMenuInfo info;
 
         /*
-         * Gets the extra info from the menu item. When an note in the Notes list is long-pressed, a
-         * context menu appears. The menu items for the menu automatically get the data
-         * associated with the note that was long-pressed. The data comes from the provider that
-         * backs the list.
+         * 从菜单项中获取额外信息。长按 Notes 列表中的便签时会弹出上下文菜单。
+         * 菜单的菜单项会自动获得与被长按便签关联的数据，这些数据来自为列表
+         * 提供后端的 provider。
          *
-         * The note's data is passed to the context menu creation routine in a ContextMenuInfo
-         * object.
+         * 便签数据通过 ContextMenuInfo 对象传给上下文菜单的创建例程。
          *
-         * When one of the context menu items is clicked, the same data is passed, along with the
-         * note ID, to onContextItemSelected() via the item parameter.
+         * 点击某个上下文菜单项时，同样的数据会连同便签 ID 一起通过 item 参数
+         * 传给 onContextItemSelected()。
          */
         try {
-            // Casts the data object in the item into the type for AdapterView objects.
+            // 把 item 中的数据对象转换为 AdapterView 对象对应的类型。
             info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
         } catch (ClassCastException e) {
 
-            // If the object can't be cast, logs an error
+            // 如果对象无法转换，则记录错误
             Log.e(TAG, "bad menuInfo", e);
 
-            // Triggers default processing of the menu item.
+            // 触发该菜单项的默认处理。
             return false;
         }
-        // Appends the selected note's ID to the URI sent with the incoming Intent.
+        // 把所选便签的 ID 追加到传入 Intent 携带的 URI 后面。
         Uri noteUri = ContentUris.withAppendedId(getIntent().getData(), info.id);
 
         /*
-         * Gets the menu item's ID and compares it to known actions.
+         * 获取菜单项的 ID，并将其与已知的 action 进行比较。
          */
         int id = item.getItemId();
         if (id == R.id.context_open) {
-            // Launch activity to view/edit the currently selected item
+            // 启动 Activity 以查看/编辑当前选中的项
             startActivity(new Intent(Intent.ACTION_EDIT, noteUri));
             return true;
-        } else if (id == R.id.context_copy) { //BEGIN_INCLUDE(copy)
-            // Gets a handle to the clipboard service.
-            ClipboardManager clipboard = (ClipboardManager)
-                    getSystemService(Context.CLIPBOARD_SERVICE);
-
-            // Copies the notes URI to the clipboard. In effect, this copies the note itself
-            clipboard.setPrimaryClip(ClipData.newUri(   // new clipboard item holding a URI
-                    getContentResolver(),               // resolver to retrieve URI info
-                    "Note",                             // label for the clip
-                    noteUri));                          // the URI
-
-            // Returns to the caller and skips further processing.
-            return true;
-            //END_INCLUDE(copy)
         } else if (id == R.id.context_delete) {
-            // Deletes the note from the provider by passing in a URI in note ID format.
-            // Please see the introductory note about performing provider operations on the
-            // UI thread.
+            // 通过传入便签 ID 格式的 URI，从 provider 中删除该便签。
+            // 关于在 UI 线程上执行 provider 操作的说明，请参见开头的注意事项。
             getContentResolver().delete(
-                    noteUri,  // The URI of the provider
-                    null,     // No where clause is needed, since only a single note ID is being
-                    // passed in.
-                    null      // No where clause is used, so no where arguments are needed.
+                    noteUri,  // provider 的 URI
+                    null,     // 不需要 where 子句，因为只传入了
+                    // 单个便签 ID。
+                    null      // 没有使用 where 子句，因此不需要 where 参数。
             );
 
-            // Returns to the caller and skips further processing.
+            // 返回调用方，跳过后续处理。
             return true;
         }
         return super.onContextItemSelected(item);
     }
 
     /**
-     * This method is called when the user clicks a note in the displayed list.
+     * 用户点击显示列表中的某条便签时调用此方法。
      *
-     * This method handles incoming actions of either PICK (get data from the provider) or
-     * GET_CONTENT (get or create data). If the incoming action is EDIT, this method sends a
-     * new Intent to start NoteEditor.
-     * @param l The ListView that contains the clicked item
-     * @param v The View of the individual item
-     * @param position The position of v in the displayed list
-     * @param id The row ID of the clicked item
+     * 本方法处理 PICK（从 provider 获取数据）或 GET_CONTENT（获取或创建数据）
+     * 这类传入 action。如果传入的 action 是 EDIT，本方法会发送一个新 Intent
+     * 来启动 NoteEditor。
+     * @param l 包含被点击项的 ListView
+     * @param v 单个项的 View
+     * @param position v 在所显示列表中的位置
+     * @param id 被点击项的行 ID
      */
     @Override
     protected void onListItemClick(ListView l, View v, int position, long id) {
 
-        // Constructs a new URI from the incoming URI and the row ID
+        // 由传入 URI 和行 ID 构造新的 URI
         Uri uri = ContentUris.withAppendedId(getIntent().getData(), id);
 
-        // Gets the action from the incoming Intent
+        // 获取传入 Intent 的 action
         String action = getIntent().getAction();
 
-        // Handles requests for note data
+        // 处理便签数据请求
         if (Intent.ACTION_PICK.equals(action) || Intent.ACTION_GET_CONTENT.equals(action)) {
 
-            // Sets the result to return to the component that called this Activity. The
-            // result contains the new URI
+            // 设置要返回给调用此 Activity 的组件的结果。该结果包含
+            // 新的 URI
             setResult(RESULT_OK, new Intent().setData(uri));
         } else {
 
-            // Sends out an Intent to start an Activity that can handle ACTION_EDIT. The
-            // Intent's data is the note ID URI. The effect is to call NoteEdit.
+            // 发送 Intent 以启动能处理 ACTION_EDIT 的 Activity。该 Intent
+            // 的数据是便签 ID URI。实际效果是调用 NoteEdit。
             startActivity(new Intent(Intent.ACTION_EDIT, uri));
         }
     }

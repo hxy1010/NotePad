@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 笔记本列表中的一项。左侧是类别色徽标，右侧是进入箭头，
+     与扁平的笔记行形成明显的层级差异。删除操作在长按菜单中。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/notebook_row"
     android:layout_width="match_parent"
@@ -8,12 +10,22 @@
     android:orientation="horizontal"
     android:paddingLeft="18dp"
     android:paddingRight="14dp"
-    android:paddingTop="16dp"
-    android:paddingBottom="16dp" >
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp" >
+
+    <TextView
+        android:id="@+id/notebook_badge"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:gravity="center"
+        android:textColor="#FFFFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginLeft="14dp"
         android:layout_weight="1"
         android:orientation="vertical" >
 
@@ -37,14 +49,12 @@
             android:singleLine="true" />
     </LinearLayout>
 
-    <ImageView
-        android:id="@+id/notebook_delete"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_marginLeft="6dp"
-        android:background="@android:color/transparent"
-        android:contentDescription="@string/menu_delete"
-        android:padding="6dp"
-        android:src="@drawable/ic_cute_delete" />
+    <TextView
+        android:layout_width="24dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="@string/chevron_right"
+        android:textColor="@color/note_text_time"
+        android:textSize="22sp" />
 
 </LinearLayout>

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Night variant: dark Holo base so titles, menu items and dialogs stay legible on the
-         dark glass action bar. Colours come from values-night/colors.xml. -->
+    <!-- 夜间版本：基于深色 Holo 主题，让标题、菜单项和对话框在深色玻璃
+         操作栏上依然清晰可读。颜色取自 values-night/colors.xml。 -->
     <style name="NotePadTheme" parent="@android:style/Theme.Holo">
         <item name="android:windowBackground">@drawable/bg_app_gradient</item>
         <item name="android:actionBarStyle">@style/NotePadActionBar</item>
@@ -16,15 +16,6 @@
         <item name="android:background">@color/app_primary</item>
         <item name="android:backgroundStacked">@color/app_primary</item>
         <item name="android:backgroundSplit">@color/app_primary</item>
-    </style>
-
-    <style name="NotePadDialogTheme" parent="@android:style/Theme.Holo.NoActionBar">
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowIsFloating">false</item>
-        <item name="android:windowIsTranslucent">true</item>
-        <item name="android:backgroundDimEnabled">false</item>
-        <item name="android:windowContentOverlay">@null</item>
     </style>
 
 </resources>

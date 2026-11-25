@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Home screen sticky note: pending todos, each row can be ticked off right on the launcher. -->
+<!-- 主屏幕便签：待完成的待办，每一行都可以直接在桌面上勾选完成。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"

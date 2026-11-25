@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Cute empty checkbox for the home screen todo rows; tapping the row ticks it off. -->
+<!-- 主屏幕待办行使用的可爱风空复选框；点击整行即可勾选完成。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="14dp"
     android:height="14dp"

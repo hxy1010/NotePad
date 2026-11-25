@@ -6,8 +6,7 @@ import android.view.View;
 import android.widget.TextView;
 
 /**
- * Wires up the floating bottom bar shared by the notes list and the todo page, and highlights
- * the tab that is currently open.
+ * 连接笔记列表与待办页面共用的悬浮底栏，并高亮当前打开的标签页。
  */
 public final class BottomNav {
 
@@ -15,10 +14,10 @@ public final class BottomNav {
     }
 
     /**
-     * Binds the bottom bar of the given activity.
+     * 绑定指定 Activity 的底栏。
      *
-     * @param activity       the host activity
-     * @param notesSelected  true to highlight the notes tab, false to highlight the todo tab
+     * @param activity       宿主 Activity
+     * @param notesSelected  为 true 时高亮笔记标签，为 false 时高亮待办标签
      */
     public static void bind(Activity activity, boolean notesSelected) {
         View notes = activity.findViewById(R.id.nav_notes);
@@ -49,7 +48,7 @@ public final class BottomNav {
         if (activity instanceof NotebookList) {
             return;
         }
-        // Reuses the existing notebook list instead of stacking another copy on the task.
+        // 复用已有的笔记簿列表，而不是在任务栈中再叠一个副本。
         Intent intent = new Intent(activity, NotebookList.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         activity.startActivity(intent);

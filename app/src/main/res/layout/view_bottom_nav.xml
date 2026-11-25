@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<!-- Floating glass bottom bar shared by the notes list and the todo page. The selected tab is
-     highlighted by BottomNav. -->
+<!-- 笔记列表与待办页面共用的悬浮玻璃底栏。选中的标签由 BottomNav
+     负责高亮。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"

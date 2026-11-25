@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 中文日期选择弹窗：年、月、日三个滚轮。月份用「1月～12月」显示，
+     避免系统日期控件在英文系统下显示英文月份。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:paddingLeft="8dp"
+    android:paddingRight="8dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="4dp" >
+
+    <NumberPicker
+        android:id="@+id/picker_year"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1.3" />
+
+    <NumberPicker
+        android:id="@+id/picker_month"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1" />
+
+    <NumberPicker
+        android:id="@+id/picker_day"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1" />
+
+</LinearLayout>

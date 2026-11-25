@@ -5,6 +5,73 @@
     android:orientation="vertical"
     android:background="@color/note_window_background" >
 
+    <!-- 最近笔记：无需先建笔记簿，取出最近几条直接查看，并提供「写一条小记」入口。 -->
+    <LinearLayout
+        android:id="@+id/recent_notes_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="12dp"
+        android:layout_marginRight="12dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_glass_row"
+        android:orientation="vertical"
+        android:paddingLeft="14dp"
+        android:paddingRight="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="4dp" >
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/recent_notes_title"
+                android:textColor="@color/section_label"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/recent_all"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="4dp"
+                android:text="@string/recent_notes_all"
+                android:textColor="@color/accent_text"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/recent_notes_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView
+            android:id="@+id/recent_notes_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="@string/recent_notes_empty"
+            android:textColor="@color/note_text_time"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/recent_note_add"
+            android:layout_width="match_parent"
+            android:layout_height="38dp"
+            android:background="?android:attr/selectableItemBackground"
+            android:gravity="center_vertical"
+            android:text="@string/recent_note_add"
+            android:textColor="@color/accent_text"
+            android:textSize="14sp" />
+    </LinearLayout>
+
     <ListView
         android:id="@android:id/list"
         android:layout_width="match_parent"

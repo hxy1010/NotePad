@@ -26,6 +26,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.ContentObserver;
 import android.database.Cursor;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -35,17 +36,21 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewParent;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.SimpleCursorAdapter;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 /**
- * Lists the notebooks. Each notebook groups many notes and has a category. Tapping a notebook
- * opens its notes; long-pressing one allows renaming or deleting it.
+ * 列出所有笔记簿。每个笔记簿归类多条笔记并带有分类。点击笔记簿会打开其中的笔记；
+ * 长按笔记簿可以重命名或删除。
  */
 public class NotebookList extends ListActivity {
 
@@ -61,17 +66,37 @@ public class NotebookList extends ListActivity {
 
     private static final String STATE_CATEGORY_FILTER = "category_filter";
 
+    /** 首页「最近笔记」最多展示的条数。 */
+    private static final int RECENT_NOTE_LIMIT = 3;
+
+    /** 「最近笔记」区块所需的列。 */
+    private static final String[] RECENT_PROJECTION = new String[] {
+            NotePad.Notes._ID,
+            NotePad.Notes.COLUMN_NAME_TITLE,
+            NotePad.Notes.COLUMN_NAME_NOTE,
+            NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE,
+    };
+
     private SimpleCursorAdapter mAdapter;
     private Cursor mCursor;
 
-    /** Selected notebook category; {@code null} means all categories are shown. */
+    /** 「最近笔记」行的容器与空状态提示。 */
+    private LinearLayout mRecentContainer;
+    private TextView mRecentEmpty;
+
+    /** 格式化「最近笔记」中显示的修改时间。 */
+    private final SimpleDateFormat mRecentFormat =
+            new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+
+    /** 当前选中的笔记簿分类；{@code null} 表示显示全部分类。 */
     private String mCategoryFilter;
 
-    /** Refreshes the list when notebooks or their notes change. */
+    /** 笔记簿或其笔记发生变化时刷新列表。 */
     private final ContentObserver mObserver = new ContentObserver(new Handler()) {
         @Override
         public void onChange(boolean selfChange) {
             queryNotebooks();
+            queryRecentNotes();
         }
     };
 
@@ -99,9 +124,33 @@ public class NotebookList extends ListActivity {
             }
         });
 
+        mRecentContainer = (LinearLayout) findViewById(R.id.recent_notes_container);
+        mRecentEmpty = (TextView) findViewById(R.id.recent_notes_empty);
+
+        // 「全部」进入只包含未归类小记的列表，与上方的最近小记保持一致。
+        findViewById(R.id.recent_all).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(NotebookList.this, NotesList.class);
+                intent.setData(NotePad.Notes.CONTENT_URI);
+                intent.putExtra(NotesList.EXTRA_UNCLASSIFIED, true);
+                startActivity(intent);
+            }
+        });
+
+        // 直接新建一条未归类的小记，无需先创建笔记簿。
+        findViewById(R.id.recent_note_add).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(Intent.ACTION_INSERT, NotePad.Notes.CONTENT_URI);
+                intent.setClass(NotebookList.this, NoteEditor.class);
+                startActivity(intent);
+            }
+        });
+
         getContentResolver().registerContentObserver(
                 NotePad.Notebooks.CONTENT_URI, true, mObserver);
-        // Note counts shown in the subtitle change when notes change too.
+        // 副标题中显示的笔记数量也会随笔记变化而更新。
         getContentResolver().registerContentObserver(
                 NotePad.Notes.CONTENT_URI, true, mObserver);
     }
@@ -110,10 +159,82 @@ public class NotebookList extends ListActivity {
     protected void onResume() {
         super.onResume();
         queryNotebooks();
+        queryRecentNotes();
         updateFilterSubtitle();
     }
 
-    /** Shows the active category under the title so the filter state is always visible. */
+    /**
+     * 查询最近的未归类小记并填充首页区块。笔记本内的笔记不会出现在这里，
+     * 最新的排在最前，最多显示 {@link #RECENT_NOTE_LIMIT} 条。
+     */
+    private void queryRecentNotes() {
+        if (mRecentContainer == null) {
+            return;
+        }
+
+        Cursor cursor = getContentResolver().query(
+                NotePad.Notes.CONTENT_URI,
+                RECENT_PROJECTION,
+                NotePad.Notes.COLUMN_NAME_NOTEBOOK_ID + " IS NULL",
+                null,
+                NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " DESC");
+        if (cursor == null) {
+            return;
+        }
+
+        mRecentContainer.removeAllViews();
+        int count = Math.min(cursor.getCount(), RECENT_NOTE_LIMIT);
+        mRecentEmpty.setVisibility(count == 0 ? View.VISIBLE : View.GONE);
+
+        for (int i = 0; i < count; i++) {
+            cursor.moveToPosition(i);
+
+            final long noteId = cursor.getLong(
+                    cursor.getColumnIndex(NotePad.Notes._ID));
+            String title = cursor.getString(
+                    cursor.getColumnIndex(NotePad.Notes.COLUMN_NAME_TITLE));
+            String note = cursor.getString(
+                    cursor.getColumnIndex(NotePad.Notes.COLUMN_NAME_NOTE));
+            long modified = cursor.getLong(
+                    cursor.getColumnIndex(NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE));
+
+            View row = getLayoutInflater().inflate(
+                    R.layout.recent_note_item, mRecentContainer, false);
+            TextView titleView = (TextView) row.findViewById(R.id.recent_note_title);
+            titleView.setText(displayTitle(title, note));
+            ((TextView) row.findViewById(R.id.recent_note_time))
+                    .setText(mRecentFormat.format(new Date(modified)));
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(Intent.ACTION_EDIT,
+                            ContentUris.withAppendedId(NotePad.Notes.CONTENT_URI, noteId));
+                    intent.setClass(NotebookList.this, NoteEditor.class);
+                    startActivity(intent);
+                }
+            });
+            mRecentContainer.addView(row);
+        }
+
+        cursor.close();
+    }
+
+    /** 有标题时显示标题；没有标题时用正文开头代替，最多保留 20 个字。 */
+    private String displayTitle(String title, String note) {
+        if (!TextUtils.isEmpty(title)) {
+            return title;
+        }
+        if (TextUtils.isEmpty(note)) {
+            return getString(R.string.note_untitled);
+        }
+        String text = note.replace('\n', ' ').trim();
+        if (text.length() > 20) {
+            text = text.substring(0, 20) + "…";
+        }
+        return text;
+    }
+
+    /** 在标题下方显示当前分类，让筛选状态始终可见。 */
     private void updateFilterSubtitle() {
         ActionBar bar = getActionBar();
         if (bar != null) {
@@ -163,23 +284,17 @@ public class NotebookList extends ListActivity {
                         ((TextView) view).setText(
                                 getString(R.string.notebook_subtitle, category, count));
 
-                        // Wires the trash icon of this row to the delete dialog.
-                        final long rowId = notebookId;
-                        final String rowName = c.getString(
-                                c.getColumnIndex(NotePad.Notebooks.COLUMN_NAME_NAME));
+                        // 左侧徽标使用类别色与类别首字，让笔记簿和笔记一眼可分。
                         View row = view;
                         while (row != null && row.getId() != R.id.notebook_row) {
-                            ViewParent parent = row.getParent();
+                            android.view.ViewParent parent = row.getParent();
                             row = parent instanceof View ? (View) parent : null;
                         }
                         if (row != null) {
-                            row.findViewById(R.id.notebook_delete)
-                                    .setOnClickListener(new View.OnClickListener() {
-                                        @Override
-                                        public void onClick(View v) {
-                                            confirmDeleteNotebook(rowId, rowName);
-                                        }
-                                    });
+                            TextView badge = (TextView) row.findViewById(R.id.notebook_badge);
+                            badge.setText(TextUtils.isEmpty(category)
+                                    ? "" : category.substring(0, 1));
+                            badge.setBackground(createBadgeBackground(category));
                         }
                         return true;
                     }
@@ -195,7 +310,7 @@ public class NotebookList extends ListActivity {
         }
     }
 
-    /** Returns how many notes belong to the given notebook. */
+    /** 返回指定笔记簿下的笔记数量。 */
     private int countNotes(long notebookId) {
         Cursor cursor = getContentResolver().query(
                 NotePad.Notes.CONTENT_URI,
@@ -211,6 +326,31 @@ public class NotebookList extends ListActivity {
         } finally {
             cursor.close();
         }
+    }
+
+    /** 根据笔记簿类别生成圆角徽标背景，颜色与类别一一对应。 */
+    private GradientDrawable createBadgeBackground(String category) {
+        String[] categories = getResources().getStringArray(R.array.notebook_categories);
+        int[] colorResIds = new int[] {
+                R.color.category_study,
+                R.color.category_work,
+                R.color.category_life,
+                R.color.category_other,
+        };
+
+        int colorResId = R.color.category_other;
+        for (int i = 0; i < categories.length && i < colorResIds.length; i++) {
+            if (categories[i].equals(category)) {
+                colorResId = colorResIds[i];
+                break;
+            }
+        }
+
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(getResources().getDisplayMetrics().density * 12f);
+        background.setColor(getResources().getColor(colorResId));
+        return background;
     }
 
     @Override
@@ -327,7 +467,7 @@ public class NotebookList extends ListActivity {
         return super.onContextItemSelected(item);
     }
 
-    /** Asks for confirmation, then deletes the notebook and all of its notes. */
+    /** 先请求确认，然后删除该笔记簿及其所有笔记。 */
     private void confirmDeleteNotebook(final long notebookId, String name) {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.delete_notebook_title)
@@ -343,7 +483,7 @@ public class NotebookList extends ListActivity {
                                         null, null);
                             }
                         })
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton(R.string.button_cancel, null)
                 .show();
     }
 
@@ -353,7 +493,7 @@ public class NotebookList extends ListActivity {
         outState.putString(STATE_CATEGORY_FILTER, mCategoryFilter);
     }
 
-    /** Lets the user show notebooks of a single category, or all of them. */
+    /** 让用户选择只显示某一分类的笔记簿，或显示全部。 */
     private void showFilterDialog() {
         final String[] categories = getResources().getStringArray(R.array.notebook_categories);
         final CharSequence[] labels = new CharSequence[categories.length + 1];
@@ -381,7 +521,7 @@ public class NotebookList extends ListActivity {
     }
 
     /**
-     * Shows the create/rename dialog. Pass a notebookId lower than zero to create a notebook.
+     * 显示新建/重命名对话框。传入小于零的 notebookId 表示新建笔记簿。
      */
     private void showNotebookDialog(final long notebookId, String name, String category) {
         View view = getLayoutInflater().inflate(R.layout.notebook_dialog, null);
@@ -412,12 +552,12 @@ public class NotebookList extends ListActivity {
                 .setTitle(notebookId < 0 ? R.string.menu_new_notebook : R.string.menu_rename)
                 .setView(view)
                 .setPositiveButton(R.string.button_ok, null)
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton(R.string.button_cancel, null)
                 .create();
 
         dialog.show();
 
-        // Validates the name instead of dismissing the dialog on an empty value.
+        // 名称为空时进行校验，而不是直接关闭对话框。
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(
                 new View.OnClickListener() {
                     @Override

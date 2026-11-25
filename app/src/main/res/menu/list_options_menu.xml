@@ -1,25 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <!--  This is our one standard application action (creating a new note). -->
+    <!--  这是应用的标准操作（新建一条笔记）。 -->
     <item android:id="@+id/menu_add"
           android:icon="@drawable/ic_cute_note_add"
           android:title="@string/menu_add"
           android:alphabeticShortcut='a'
           android:showAsAction="ifRoom|withText" />
-    <!--  If there is currently data in the clipboard, this adds a PASTE menu item to the menu
-          so that the user can paste in the data.. -->
-    <item android:id="@+id/menu_paste"
-          android:icon="@drawable/ic_cute_note_add"
-          android:title="@string/menu_paste"
-          android:alphabeticShortcut='p' />
-    <!--  Lets the user choose the order of the notes. -->
+    <!--  让用户选择笔记的排序方式。 -->
     <item android:id="@+id/menu_sort"
           android:icon="@drawable/ic_cute_sort"
           android:title="@string/sort_title"
           android:showAsAction="ifRoom|withText" />
-    <!--  Exports every note to a plain text file chosen by the user. -->
-    <item android:id="@+id/menu_export"
-          android:icon="@drawable/ic_cute_save"
-          android:title="@string/menu_export"
-          android:alphabeticShortcut='x' />
 </menu>

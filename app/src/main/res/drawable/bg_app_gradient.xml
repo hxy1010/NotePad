@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Pastel base gradient plus soft radial colour blobs. The blobs have no hard edge, which
-     gives the frosted, out-of-focus backdrop the glass cards sit on. -->
+<!-- 柔和的底色渐变加上柔和的径向色斑。色斑没有硬边，
+     形成毛玻璃卡片所依托的磨砂、失焦背景。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">

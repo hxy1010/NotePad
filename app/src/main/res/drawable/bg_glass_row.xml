@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One frosted glass card: a white-to-transparent gradient, a bright 1dp rim and
-     generously rounded corners so the pastel backdrop shows through. -->
+<!-- 一张磨砂玻璃卡片：从白色到透明的渐变、明亮的 1dp 描边，
+     以及足够大的圆角，让粉彩背景透出来。 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <shape android:shape="rectangle">

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Light, airy theme matched to the pastel glass backdrop. -->
+    <!-- 明亮轻盈的主题，与粉彩玻璃背景相配。 -->
     <style name="NotePadTheme" parent="@android:style/Theme.Holo.Light">
         <item name="android:windowBackground">@drawable/bg_app_gradient</item>
         <item name="android:logo">@drawable/ic_cute_notebook</item>
@@ -18,17 +18,7 @@
         <item name="android:backgroundSplit">@color/app_primary</item>
     </style>
 
-    <!-- Full-screen translucent window that hosts the floating glass card. -->
-    <style name="NotePadDialogTheme" parent="@android:style/Theme.Holo.Light.NoActionBar">
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowIsFloating">false</item>
-        <item name="android:windowIsTranslucent">true</item>
-        <item name="android:backgroundDimEnabled">false</item>
-        <item name="android:windowContentOverlay">@null</item>
-    </style>
-
-    <!-- Rounded glass button used by the note editor. -->
+    <!-- 笔记编辑器及对话框使用的圆角玻璃按钮。 -->
     <style name="NotePadActionButton" parent="@android:style/Widget.Holo.Light.Button">
         <item name="android:background">@drawable/bg_action_button</item>
         <item name="android:textColor">@color/accent_text</item>
@@ -38,15 +28,6 @@
         <item name="android:minWidth">0dp</item>
         <item name="android:paddingLeft">8dp</item>
         <item name="android:paddingRight">8dp</item>
-    </style>
-
-    <!-- Small caption above the attachment sections. -->
-    <style name="NotePadSectionLabel">
-        <item name="android:textColor">@color/section_label</item>
-        <item name="android:textSize">11sp</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:layout_marginTop">16dp</item>
-        <item name="android:layout_marginBottom">6dp</item>
     </style>
 
 </resources>

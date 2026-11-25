@@ -31,23 +31,23 @@ import android.widget.RemoteViews;
 import java.util.ArrayList;
 
 /**
- * Home screen sticky note that lists the pending todos. Each row can be ticked off directly on
- * the launcher; tapping anywhere else opens the standalone todo page {@link TodoList}.
+ * 主屏幕上的便签，列出待完成的待办。每一行都可以直接在桌面上勾选完成；
+ * 点击其他区域会打开独立的待办页面 {@link TodoList}。
  */
 public class NoteWidgetProvider extends AppWidgetProvider {
 
-    /** Sent by {@link NotePadProvider} whenever data changes, so the widget refreshes at once. */
+    /** 数据变化时由 {@link NotePadProvider} 发出，用于让小组件立即刷新。 */
     public static final String ACTION_NOTES_CHANGED =
             "com.example.android.notepad.ACTION_NOTES_CHANGED";
 
-    /** Sent by a widget row when the user ticks a todo off. */
+    /** 用户在小部件某一行勾选待办时发出。 */
     public static final String ACTION_TICK_TODO =
             "com.example.android.notepad.ACTION_TICK_TODO";
 
-    /** Extra carrying the id of the todo that was ticked off. */
+    /** 携带被勾选待办 id 的 Extra。 */
     public static final String EXTRA_TODO_ID = "todo_id";
 
-    /** How many todo rows the widget shows at most. */
+    /** 小部件最多显示的待办行数。 */
     private static final int MAX_ROWS = 5;
 
     private static final int[] ROW_IDS = new int[] {
@@ -68,6 +68,8 @@ public class NoteWidgetProvider extends AppWidgetProvider {
 
     private static final String SORT_ORDER =
             NotePad.Todos.COLUMN_NAME_DONE + " ASC, "
+                    + NotePad.Todos.COLUMN_NAME_DEADLINE + " IS NULL, "
+                    + NotePad.Todos.COLUMN_NAME_DEADLINE + " ASC, "
                     + NotePad.Todos.COLUMN_NAME_CREATE_DATE + " DESC";
 
     @Override
@@ -90,7 +92,7 @@ public class NoteWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    /** Marks the tapped todo as done. */
+    /** 把被点击的待办标记为已完成。 */
     private static void tickTodo(Context context, long todoId) {
         if (todoId <= 0) {
             return;
@@ -111,7 +113,7 @@ public class NoteWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    /** Loads the pending todos and paints one widget instance with them. */
+    /** 加载待完成的待办，并用它们绘制一个小部件实例。 */
     private static void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_note);
 
@@ -147,7 +149,7 @@ public class NoteWidgetProvider extends AppWidgetProvider {
             }
         }
 
-        // Binds every visible row to one pending todo; the row itself is the tick target.
+        // 把每个可见行绑定到一条待办；整行本身就是勾选的目标。
         for (int i = 0; i < MAX_ROWS; i++) {
             if (i < pendingTexts.size()) {
                 long todoId = pendingIds.get(i);

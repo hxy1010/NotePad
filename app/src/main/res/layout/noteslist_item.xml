@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One item of the notes list: title and modification time on the first line,
-     a one-line preview of the note content on the second line. -->
+<!-- 笔记列表中的一项：第一行是标题、修改时间和删除按钮，
+     第二行是笔记内容的一行预览。使用扁平样式（无卡片底），
+     以便与笔记本卡片区分层级。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="?android:attr/selectableItemBackground"
     android:orientation="vertical"
-    android:background="@drawable/bg_glass_row"
     android:paddingLeft="18dp"
     android:paddingRight="18dp"
-    android:paddingTop="14dp"
-    android:paddingBottom="14dp" >
+    android:paddingTop="13dp"
+    android:paddingBottom="13dp" >
 
     <LinearLayout
         android:layout_width="match_parent"

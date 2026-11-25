@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 首页「最近笔记」区块中的一行：标题在左，修改时间在右。
+     使用扁平的纯文字样式，与上方的笔记本卡片形成明显区别。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="38dp"
+    android:background="?android:attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:orientation="horizontal" >
+
+    <TextView
+        android:id="@+id/recent_note_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:singleLine="true"
+        android:textColor="@color/note_text_primary"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/recent_note_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:singleLine="true"
+        android:textColor="@color/note_text_time"
+        android:textSize="11sp" />
+
+</LinearLayout>

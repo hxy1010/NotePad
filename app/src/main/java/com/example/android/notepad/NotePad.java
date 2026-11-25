@@ -20,146 +20,123 @@ import android.net.Uri;
 import android.provider.BaseColumns;
 
 /**
- * Defines a contract between the Note Pad content provider and its clients. A contract defines the
- * information that a client needs to access the provider as one or more data tables. A contract
- * is a public, non-extendable (final) class that contains constants defining column names and
- * URIs. A well-written client depends only on the constants in the contract.
+ * 定义 NotePad 内容提供者（ContentProvider）与其客户端之间的契约。契约以一张或多张
+ * 数据表的形式，描述了客户端访问该提供者所需的信息。契约是一个公开且不可继承
+ * （final）的类，其中包含定义列名和 URI 的常量。编写良好的客户端只依赖契约
+ * 中定义的常量。
  */
 public final class NotePad {
     public static final String AUTHORITY = "com.google.provider.NotePad";
 
-    // This class cannot be instantiated
+    // 此类不能被实例化
     private NotePad() {
     }
 
     /**
-     * Notes table contract
+     * 笔记表契约
      */
     public static final class Notes implements BaseColumns {
 
-        // This class cannot be instantiated
+        // 此类不能被实例化
         private Notes() {}
 
         /**
-         * The table name offered by this provider
+         * 本提供者对外提供的表名
          */
         public static final String TABLE_NAME = "notes";
 
         /*
-         * URI definitions
+         * URI 定义
          */
 
         /**
-         * The scheme part for this provider's URI
+         * 本提供者 URI 的 scheme 部分
          */
         private static final String SCHEME = "content://";
 
         /**
-         * Path parts for the URIs
+         * URI 的路径部分
          */
 
         /**
-         * Path part for the Notes URI
+         * 笔记集合 URI 的路径部分
          */
         private static final String PATH_NOTES = "/notes";
 
         /**
-         * Path part for the Note ID URI
+         * 单条笔记 ID URI 的路径部分
          */
         private static final String PATH_NOTE_ID = "/notes/";
 
         /**
-         * 0-relative position of a note ID segment in the path part of a note ID URI
-         */
-        public static final int NOTE_ID_PATH_POSITION = 1;
-
-        /**
-         * Path part for the Live Folder URI
-         */
-        private static final String PATH_LIVE_FOLDER = "/live_folders/notes";
-
-        /**
-         * The content:// style URL for this table
+         * 本表的 content:// 风格 URL
          */
         public static final Uri CONTENT_URI =  Uri.parse(SCHEME + AUTHORITY + PATH_NOTES);
 
         /**
-         * The content URI base for a single note. Callers must
-         * append a numeric note id to this Uri to retrieve a note
+         * 单条笔记的内容 URI 基址。调用方必须在此 Uri
+         * 后追加数字形式的笔记 ID 才能获取该笔记
          */
         public static final Uri CONTENT_ID_URI_BASE
             = Uri.parse(SCHEME + AUTHORITY + PATH_NOTE_ID);
 
-        /**
-         * The content URI match pattern for a single note, specified by its ID. Use this to match
-         * incoming URIs or to construct an Intent.
-         */
-        public static final Uri CONTENT_ID_URI_PATTERN
-            = Uri.parse(SCHEME + AUTHORITY + PATH_NOTE_ID + "/#");
-
-        /**
-         * The content Uri pattern for a notes listing for live folders
-         */
-        public static final Uri LIVE_FOLDER_URI
-            = Uri.parse(SCHEME + AUTHORITY + PATH_LIVE_FOLDER);
-
         /*
-         * MIME type definitions
+         * MIME 类型定义
          */
 
         /**
-         * The MIME type of {@link #CONTENT_URI} providing a directory of notes.
+         * {@link #CONTENT_URI} 的 MIME 类型，表示笔记目录。
          */
         public static final String CONTENT_TYPE = "vnd.android.cursor.dir/vnd.google.note";
 
         /**
-         * The MIME type of a {@link #CONTENT_URI} sub-directory of a single
-         * note.
+         * {@link #CONTENT_URI} 下单条笔记子目录的 MIME
+         * 类型。
          */
         public static final String CONTENT_ITEM_TYPE = "vnd.android.cursor.item/vnd.google.note";
 
         /**
-         * The default sort order for this table
+         * 本表的默认排序方式
          */
         public static final String DEFAULT_SORT_ORDER = "modified DESC";
 
         /*
-         * Column definitions
+         * 列定义
          */
 
         /**
-         * Column name for the title of the note
-         * <P>Type: TEXT</P>
+         * 笔记标题的列名
+         * <P>类型：TEXT</P>
          */
         public static final String COLUMN_NAME_TITLE = "title";
 
         /**
-         * Column name of the note content
-         * <P>Type: TEXT</P>
+         * 笔记内容的列名
+         * <P>类型：TEXT</P>
          */
         public static final String COLUMN_NAME_NOTE = "note";
 
         /**
-         * Column name for the creation timestamp
-         * <P>Type: INTEGER (long from System.curentTimeMillis())</P>
+         * 创建时间戳的列名
+         * <P>类型：INTEGER（由 System.curentTimeMillis() 得到的 long 值）</P>
          */
         public static final String COLUMN_NAME_CREATE_DATE = "created";
 
         /**
-         * Column name for the modification timestamp
-         * <P>Type: INTEGER (long from System.curentTimeMillis())</P>
+         * 修改时间戳的列名
+         * <P>类型：INTEGER（由 System.curentTimeMillis() 得到的 long 值）</P>
          */
         public static final String COLUMN_NAME_MODIFICATION_DATE = "modified";
 
         /**
-         * Column name of the notebook this note belongs to
-         * <P>Type: INTEGER (foreign key to the notebooks table)</P>
+         * 笔记所属笔记本的列名
+         * <P>类型：INTEGER（指向 notebooks 表的外键）</P>
          */
         public static final String COLUMN_NAME_NOTEBOOK_ID = "notebook_id";
     }
 
     /**
-     * Notebooks table contract. A notebook groups many notes and carries a category.
+     * 笔记本表契约。一个笔记本聚合多条笔记，并带有一个分类。
      */
     public static final class Notebooks implements BaseColumns {
 
@@ -180,63 +157,22 @@ public final class NotePad {
 
         public static final String DEFAULT_SORT_ORDER = "modified DESC";
 
-        /** Notebook name <P>Type: TEXT</P> */
+        /** 笔记本名称 <P>类型：TEXT</P> */
         public static final String COLUMN_NAME_NAME = "name";
 
-        /** Notebook category, one of the values in the notebook_categories array
-         *  <P>Type: TEXT</P> */
+        /** 笔记本分类，取值为 notebook_categories 数组中的某一项
+         *  <P>类型：TEXT</P> */
         public static final String COLUMN_NAME_CATEGORY = "category";
 
-        /** Creation timestamp <P>Type: INTEGER</P> */
+        /** 创建时间戳 <P>类型：INTEGER</P> */
         public static final String COLUMN_NAME_CREATE_DATE = "created";
 
-        /** Modification timestamp <P>Type: INTEGER</P> */
+        /** 修改时间戳 <P>类型：INTEGER</P> */
         public static final String COLUMN_NAME_MODIFICATION_DATE = "modified";
     }
 
     /**
-     * Attachments table contract. Stores photos and audio recordings that belong to a note.
-     */
-    public static final class Attachments implements BaseColumns {
-
-        private Attachments() {}
-
-        public static final String TABLE_NAME = "attachments";
-
-        private static final String SCHEME = "content://";
-        private static final String PATH_ATTACHMENTS = "/attachments";
-        private static final String PATH_ATTACHMENT_ID = "/attachments/";
-
-        public static final Uri CONTENT_URI = Uri.parse(SCHEME + AUTHORITY + PATH_ATTACHMENTS);
-        public static final Uri CONTENT_ID_URI_BASE =
-                Uri.parse(SCHEME + AUTHORITY + PATH_ATTACHMENT_ID);
-
-        public static final String CONTENT_TYPE = "vnd.android.cursor.dir/vnd.google.attachment";
-        public static final String CONTENT_ITEM_TYPE =
-                "vnd.android.cursor.item/vnd.google.attachment";
-
-        public static final String DEFAULT_SORT_ORDER = "created ASC";
-
-        /** ID of the note this attachment belongs to <P>Type: INTEGER</P> */
-        public static final String COLUMN_NAME_NOTE_ID = "note_id";
-
-        /** Attachment kind: {@link #TYPE_IMAGE} or {@link #TYPE_AUDIO}
-         *  <P>Type: TEXT</P> */
-        public static final String COLUMN_NAME_TYPE = "type";
-
-        /** Absolute path of the attachment file in the app's private storage
-         *  <P>Type: TEXT</P> */
-        public static final String COLUMN_NAME_PATH = "path";
-
-        /** Creation timestamp <P>Type: INTEGER</P> */
-        public static final String COLUMN_NAME_CREATE_DATE = "created";
-
-        public static final String TYPE_IMAGE = "image";
-        public static final String TYPE_AUDIO = "audio";
-    }
-
-    /**
-     * Todos table contract. Stores simple checkable todo items that belong to a note.
+     * 待办表契约。用于存储属于某条笔记的简单可勾选待办事项。
      */
     public static final class Todos implements BaseColumns {
 
@@ -255,18 +191,22 @@ public final class NotePad {
         public static final String CONTENT_TYPE = "vnd.android.cursor.dir/vnd.google.todo";
         public static final String CONTENT_ITEM_TYPE = "vnd.android.cursor.item/vnd.google.todo";
 
-        public static final String DEFAULT_SORT_ORDER = "created ASC";
+        public static final String DEFAULT_SORT_ORDER =
+                "deadline IS NULL, deadline ASC, created DESC";
 
-        /** ID of the note this todo belongs to <P>Type: INTEGER</P> */
+        /** 此待办所属笔记的 ID <P>类型：INTEGER</P> */
         public static final String COLUMN_NAME_NOTE_ID = "note_id";
 
-        /** Todo text <P>Type: TEXT</P> */
+        /** 待办内容 <P>类型：TEXT</P> */
         public static final String COLUMN_NAME_CONTENT = "content";
 
-        /** 1 when the todo is done, 0 otherwise <P>Type: INTEGER</P> */
+        /** 待办已完成时为 1，否则为 0 <P>类型：INTEGER</P> */
         public static final String COLUMN_NAME_DONE = "done";
 
-        /** Creation timestamp <P>Type: INTEGER</P> */
+        /** 创建时间戳 <P>类型：INTEGER</P> */
         public static final String COLUMN_NAME_CREATE_DATE = "created";
+
+        /** 截止日期时间戳；未设置时为 NULL <P>类型：INTEGER</P> */
+        public static final String COLUMN_NAME_DEADLINE = "deadline";
     }
 }

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One todo row: a glass checkbox plus the creation timestamp on the right. -->
+<!-- 一条待办：玻璃复选框、截止日期、编辑与删除入口。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -22,7 +22,7 @@
         android:textSize="16sp" />
 
     <TextView
-        android:id="@+id/todo_time"
+        android:id="@+id/todo_deadline"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginLeft="8dp"
@@ -31,10 +31,20 @@
         android:singleLine="true" />
 
     <ImageView
+        android:id="@+id/todo_edit"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_marginLeft="4dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/todo_edit_title"
+        android:padding="6dp"
+        android:src="@drawable/ic_cute_edit" />
+
+    <ImageView
         android:id="@+id/todo_delete"
         android:layout_width="34dp"
         android:layout_height="34dp"
-        android:layout_marginLeft="6dp"
+        android:layout_marginLeft="2dp"
         android:background="@android:color/transparent"
         android:contentDescription="@string/menu_delete"
         android:padding="6dp"

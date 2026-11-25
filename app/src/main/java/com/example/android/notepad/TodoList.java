@@ -20,16 +20,19 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CursorAdapter;
 import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.NumberPicker;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
 /**
- * Standalone todo page. Todos are no longer tied to a single note: this screen lists every
- * todo, lets the user add new ones, tick them off and delete them with a long press.
+ * 独立的待办页面。待办不再依附于单条笔记：此页面列出全部待办，用户可以新增待办、
+ * 勾选完成，并通过长按删除。
  */
 public class TodoList extends ListActivity {
 
@@ -38,15 +41,23 @@ public class TodoList extends ListActivity {
             NotePad.Todos.COLUMN_NAME_CONTENT,
             NotePad.Todos.COLUMN_NAME_DONE,
             NotePad.Todos.COLUMN_NAME_CREATE_DATE,
+            NotePad.Todos.COLUMN_NAME_DEADLINE,
     };
 
+    /** 未完成的排在前面；同一状态下按截止日期升序，未设置截止日期的排在最后。 */
     private static final String SORT_ORDER =
             NotePad.Todos.COLUMN_NAME_DONE + " ASC, "
+                    + NotePad.Todos.COLUMN_NAME_DEADLINE + " IS NULL, "
+                    + NotePad.Todos.COLUMN_NAME_DEADLINE + " ASC, "
                     + NotePad.Todos.COLUMN_NAME_CREATE_DATE + " DESC";
 
-    /** Formats the creation timestamp shown at the end of each row. */
+    /** 格式化每行末尾显示的创建时间。 */
     private final SimpleDateFormat mDateFormat = new SimpleDateFormat(
             "yyyy-MM-dd HH:mm", Locale.getDefault());
+
+    /** 格式化截止日期（只显示日期部分）。 */
+    private final SimpleDateFormat mDeadlineFormat = new SimpleDateFormat(
+            "yyyy-MM-dd", Locale.getDefault());
 
     private TodoAdapter mAdapter;
     private Cursor mCursor;
@@ -72,7 +83,7 @@ public class TodoList extends ListActivity {
         findViewById(R.id.empty_new_todo).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showAddTodoDialog();
+                showTodoDialog(-1);
             }
         });
 
@@ -123,34 +134,122 @@ public class TodoList extends ListActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.menu_add_todo) {
-            showAddTodoDialog();
+            showTodoDialog(-1);
             return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
-    private void showAddTodoDialog() {
-        final EditText input = new EditText(this);
-        input.setHint(R.string.todo_hint);
+    /** 点击某一行的空白区域时，打开编辑对话框。 */
+    @Override
+    protected void onListItemClick(ListView l, View v, int position, long id) {
+        super.onListItemClick(l, v, position, id);
+        if (id > 0) {
+            showTodoDialog(id);
+        }
+    }
+
+    /**
+     * 弹出新建或编辑待办的对话框，todoId 小于等于 0 时表示新建。
+     * 对话框中可以修改待办内容，并选择或清除截止日期。
+     */
+    private void showTodoDialog(final long todoId) {
+        final boolean editing = todoId > 0;
+        View contentView = getLayoutInflater().inflate(R.layout.todo_edit_dialog, null);
+        final EditText input = (EditText) contentView.findViewById(R.id.todo_edit_content);
+        final TextView deadlineView =
+                (TextView) contentView.findViewById(R.id.todo_edit_deadline);
+        final TextView clearView = (TextView) contentView.findViewById(R.id.todo_edit_clear);
+
+        // deadline[0] 为 0 表示未设置截止日期。
+        final long[] deadline = new long[] { 0 };
+        if (editing) {
+            Cursor cursor = getContentResolver().query(
+                    ContentUris.withAppendedId(NotePad.Todos.CONTENT_ID_URI_BASE, todoId),
+                    new String[] {
+                            NotePad.Todos.COLUMN_NAME_CONTENT,
+                            NotePad.Todos.COLUMN_NAME_DEADLINE,
+                    },
+                    null, null, null);
+            if (cursor != null) {
+                try {
+                    if (cursor.moveToFirst()) {
+                        String text = cursor.getString(0);
+                        input.setText(text);
+                        if (text != null) {
+                            input.setSelection(text.length());
+                        }
+                        if (!cursor.isNull(1)) {
+                            deadline[0] = cursor.getLong(1);
+                        }
+                    }
+                } finally {
+                    cursor.close();
+                }
+            }
+        }
+
+        updateDeadlineView(deadlineView, clearView, deadline[0]);
+
+        deadlineView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showDeadlinePicker(deadline, deadlineView, clearView);
+            }
+        });
+
+        clearView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                deadline[0] = 0;
+                updateDeadlineView(deadlineView, clearView, 0);
+            }
+        });
 
         new AlertDialog.Builder(this)
-                .setTitle(R.string.todo_add_title)
-                .setView(input)
+                .setTitle(editing ? R.string.todo_edit_title : R.string.todo_add_title)
+                .setView(contentView)
                 .setPositiveButton(R.string.button_ok, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         String content = input.getText().toString().trim();
                         if (content.length() == 0) {
+                            Toast.makeText(TodoList.this, R.string.todo_content_empty,
+                                    Toast.LENGTH_SHORT).show();
                             return;
                         }
                         ContentValues values = new ContentValues();
                         values.put(NotePad.Todos.COLUMN_NAME_CONTENT, content);
-                        values.put(NotePad.Todos.COLUMN_NAME_DONE, 0);
-                        getContentResolver().insert(NotePad.Todos.CONTENT_URI, values);
+                        if (deadline[0] > 0) {
+                            values.put(NotePad.Todos.COLUMN_NAME_DEADLINE, deadline[0]);
+                        } else {
+                            values.putNull(NotePad.Todos.COLUMN_NAME_DEADLINE);
+                        }
+                        if (editing) {
+                            getContentResolver().update(
+                                    ContentUris.withAppendedId(
+                                            NotePad.Todos.CONTENT_ID_URI_BASE, todoId),
+                                    values, null, null);
+                        } else {
+                            values.put(NotePad.Todos.COLUMN_NAME_DONE, 0);
+                            getContentResolver().insert(NotePad.Todos.CONTENT_URI, values);
+                        }
                     }
                 })
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton(R.string.button_cancel, null)
                 .show();
+    }
+
+    /** 根据截止日期更新对话框中的文字与"清除"按钮的可见性。 */
+    private void updateDeadlineView(TextView deadlineView, TextView clearView, long deadline) {
+        if (deadline > 0) {
+            deadlineView.setText(getString(R.string.todo_deadline_value,
+                    mDeadlineFormat.format(new Date(deadline))));
+            clearView.setVisibility(View.VISIBLE);
+        } else {
+            deadlineView.setText(R.string.todo_deadline_none);
+            clearView.setVisibility(View.GONE);
+        }
     }
 
     private void confirmDeleteTodo(final long todoId) {
@@ -166,11 +265,90 @@ public class TodoList extends ListActivity {
                                 null, null);
                     }
                 })
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton(R.string.button_cancel, null)
                 .show();
     }
 
-    /** Cursor adapter that renders one glass checkbox row per todo. */
+    /**
+     * 显示自绘的中文日期选择弹窗。系统的 DatePickerDialog 月份名称跟随系统语言，
+     * 英文系统下会显示英文，因此这里使用三个滚轮自行拼出中文界面。
+     */
+    private void showDeadlinePicker(final long[] deadline,
+            final TextView deadlineView, final TextView clearView) {
+        View contentView = getLayoutInflater().inflate(R.layout.date_picker_dialog, null);
+        final NumberPicker yearPicker =
+                (NumberPicker) contentView.findViewById(R.id.picker_year);
+        final NumberPicker monthPicker =
+                (NumberPicker) contentView.findViewById(R.id.picker_month);
+        final NumberPicker dayPicker =
+                (NumberPicker) contentView.findViewById(R.id.picker_day);
+
+        Calendar calendar = Calendar.getInstance();
+        if (deadline[0] > 0) {
+            calendar.setTimeInMillis(deadline[0]);
+        }
+        int year = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH);
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+
+        yearPicker.setMinValue(year - 5);
+        yearPicker.setMaxValue(year + 10);
+        yearPicker.setValue(year);
+
+        String[] months = new String[12];
+        for (int i = 0; i < months.length; i++) {
+            months[i] = getString(R.string.month_label, i + 1);
+        }
+        monthPicker.setMinValue(0);
+        monthPicker.setMaxValue(11);
+        monthPicker.setDisplayedValues(months);
+        monthPicker.setValue(month);
+
+        updateDayRange(yearPicker.getValue(), monthPicker.getValue(), dayPicker, day);
+
+        NumberPicker.OnValueChangeListener listener = new NumberPicker.OnValueChangeListener() {
+            @Override
+            public void onValueChange(NumberPicker picker, int oldVal, int newVal) {
+                updateDayRange(yearPicker.getValue(), monthPicker.getValue(), dayPicker,
+                        dayPicker.getValue());
+            }
+        };
+        yearPicker.setOnValueChangedListener(listener);
+        monthPicker.setOnValueChangedListener(listener);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.todo_deadline_pick_title)
+                .setView(contentView)
+                .setPositiveButton(R.string.button_ok, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        // 截止时间取当天 23:59，便于按日期比较是否逾期。
+                        Calendar picked = Calendar.getInstance();
+                        picked.set(yearPicker.getValue(), monthPicker.getValue(),
+                                dayPicker.getValue(), 23, 59, 59);
+                        picked.set(Calendar.MILLISECOND, 0);
+                        deadline[0] = picked.getTimeInMillis();
+                        updateDeadlineView(deadlineView, clearView, deadline[0]);
+                    }
+                })
+                .setNegativeButton(R.string.button_cancel, null)
+                .show();
+    }
+
+    /** 按年月更新「日」滚轮的最大值，并尽量保留原先选中的日期。 */
+    private void updateDayRange(int year, int month, NumberPicker dayPicker, int preferredDay) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.YEAR, year);
+        calendar.set(Calendar.MONTH, month);
+        int maxDay = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
+        int day = Math.min(Math.max(preferredDay, 1), maxDay);
+        dayPicker.setDisplayedValues(null);
+        dayPicker.setMinValue(1);
+        dayPicker.setMaxValue(maxDay);
+        dayPicker.setValue(day);
+    }
+
+    /** 为每条待办渲染一行毛玻璃复选框的 Cursor 适配器。 */
     private class TodoAdapter extends CursorAdapter {
 
         TodoAdapter(Context context, Cursor cursor) {
@@ -185,7 +363,7 @@ public class TodoList extends ListActivity {
         @Override
         public void bindView(View view, Context context, Cursor cursor) {
             CheckBox checkBox = (CheckBox) view.findViewById(R.id.todo_check);
-            TextView time = (TextView) view.findViewById(R.id.todo_time);
+            TextView deadlineView = (TextView) view.findViewById(R.id.todo_deadline);
 
             final long todoId = cursor.getLong(cursor.getColumnIndex(NotePad.Todos._ID));
             String content = cursor.getString(
@@ -194,8 +372,21 @@ public class TodoList extends ListActivity {
                     cursor.getColumnIndex(NotePad.Todos.COLUMN_NAME_DONE)) != 0;
             long created = cursor.getLong(
                     cursor.getColumnIndex(NotePad.Todos.COLUMN_NAME_CREATE_DATE));
+            int deadlineIndex = cursor.getColumnIndex(NotePad.Todos.COLUMN_NAME_DEADLINE);
+            long deadline = cursor.isNull(deadlineIndex) ? 0 : cursor.getLong(deadlineIndex);
 
-            time.setText(mDateFormat.format(new Date(created)));
+            if (deadline > 0) {
+                boolean overdue = !done && deadline < System.currentTimeMillis();
+                deadlineView.setText(getString(
+                        overdue ? R.string.todo_deadline_overdue : R.string.todo_deadline_row,
+                        mDeadlineFormat.format(new Date(deadline))));
+                deadlineView.setTextColor(getResources().getColor(
+                        overdue ? android.R.color.holo_red_dark : R.color.note_text_time));
+            } else {
+                // 未设置截止日期时仍显示创建时间，保留原有时间信息。
+                deadlineView.setText(mDateFormat.format(new Date(created)));
+                deadlineView.setTextColor(getResources().getColor(R.color.note_text_time));
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 checkBox.setButtonTintList(android.content.res.ColorStateList.valueOf(
@@ -221,6 +412,22 @@ public class TodoList extends ListActivity {
                 public boolean onLongClick(View v) {
                     confirmDeleteTodo(todoId);
                     return true;
+                }
+            });
+
+            // 点击行的空白区域（非复选框、非图标）即可编辑待办。
+            view.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showTodoDialog(todoId);
+                }
+            });
+
+            View edit = view.findViewById(R.id.todo_edit);
+            edit.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showTodoDialog(todoId);
                 }
             });
 

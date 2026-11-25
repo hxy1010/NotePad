@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 手绘风小铅笔图标，用于编辑待办。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FF9FE0CC"
+        android:pathData="M4.6,19.4 L5.4,15.8 L16.1,5.1 A1.7,1.7 0 0 1 18.5,5.1 L18.9,5.5 A1.7,1.7 0 0 1 18.9,7.9 L8.2,18.6 Z" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M4.6,19.4 L5.4,15.8 L16.1,5.1 A1.7,1.7 0 0 1 18.5,5.1 L18.9,5.5 A1.7,1.7 0 0 1 18.9,7.9 L8.2,18.6 Z"
+        android:strokeColor="#FF4FBF9F"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="1.6" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M14.9,6.3 L17.7,9.1"
+        android:strokeColor="#FF4FBF9F"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.4" />
+</vector>
